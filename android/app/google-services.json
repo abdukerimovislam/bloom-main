@@ -1,0 +1,54 @@
+{
+  "project_info": {
+    "project_number": "30319094479",
+    "project_id": "bloom-31efb",
+    "storage_bucket": "bloom-31efb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:30319094479:android:4eea08fa808909f9be65ba",
+        "android_client_info": {
+          "package_name": "com.midas.bloom"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "30319094479-mr44inbsarfqmlqgg00sdcho1nl5vnct.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.midas.bloom",
+            "certificate_hash": "66e124d45df5bd54613c47861244d945275e682a"
+          }
+        },
+        {
+          "client_id": "30319094479-s53mrm8k1ctfuvlalk8gffq489hqgpp4.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDiDnV0R_J0aw_ZpUWIG-QNjPnPf76UcnA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "30319094479-s53mrm8k1ctfuvlalk8gffq489hqgpp4.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "30319094479-ruc6pvekmmtu6uvhq84eq17ri48pl664.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.midas.bloom"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

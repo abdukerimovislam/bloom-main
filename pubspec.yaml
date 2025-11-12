@@ -1,0 +1,58 @@
+name: bloom
+description: A new Flutter project.
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0' # Убедись, что твоя версия SDK подходит
+
+dependencies:
+  flutter:
+    sdk: flutter
+  # Добавь эту строку
+  flutter_localizations:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.2
+  # Мы также добавим пакет intl для управления переводами
+  intl: ^0.20.2 # или более новая версия
+  shared_preferences: ^2.2.2
+  table_calendar: ^3.2.0
+  introduction_screen: ^4.0.0
+  numberpicker: ^2.1.2
+  url_launcher: ^6.3.2
+  flutter_local_notifications: ^17.0.0 # (или более новая)
+  timezone: ^0.9.3 # (или более новая)
+  page_transition: ^2.1.0
+  lottie: ^3.1.0
+  flutter_animate: ^4.5.0
+  confetti: ^0.7.0
+  wrapper: ^1.0.2
+  firebase_core: ^3.1.1
+  firebase_auth: ^5.1.1
+  cloud_firestore: ^5.0.2
+  google_sign_in: ^6.2.1
+  font_awesome_flutter: ^10.12.0
+
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.0
+
+flutter:
+  # Добавь эту строку
+  generate: true
+
+  uses-material-design: true
+
+
+  assets:
+    - assets/lottie/
+
+  fonts:
+    - family: Nunito
+      fonts:
+        - asset: assets/fonts/Nunito-Variable.ttf
+        - asset: assets/fonts/Nunito-Italic-Variable.ttf
+          style: italic
