@@ -1,11 +1,10 @@
 // Файл: lib/screens/auth_gate.dart
 
+import 'dart:async';
 import 'package:bloom/navigation/app_router.dart';
 import 'package:bloom/services/auth_service.dart';
-// --- ИЗМЕНЕНИЕ: Импортируем FirestoreService и SettingsService ---
 import 'package:bloom/services/firestore_service.dart';
-import 'package:bloom/services/settings_service.dart';
-// ---
+import 'package:bloom/services/sync_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
@@ -18,70 +17,83 @@ class AuthGate extends StatefulWidget {
 }
 
 class _AuthGateState extends State<AuthGate> {
-
-  // --- ИЗМЕНЕНИЕ: Логика "Вход и Синхронизация" ---
-  Future<bool> _syncAndCheckOnboarding() async {
-    // 1. Скачиваем все настройки из Firestore в SharedPreferences
-    final settingsService = SettingsService();
-    await settingsService.syncFromFirestore();
-
-    // TODO: Здесь мы должны также скачивать
-    // cycle_service, symptom_service, pill_service
-
-    // 2. Проверяем, пройден ли онбординг (уже в Firestore)
-    final firestoreService = FirestoreService();
-    return await firestoreService.isOnboardingCompleteInCloud();
-  }
-  // ---
+  final AuthService _authService = AuthService();
+  final SyncService _syncService = SyncService();
+  final FirestoreService _firestoreService = FirestoreService();
 
   @override
-  Widget build(BuildContext DART_SDK_LOCAL_BUILT_IN_TYPE_CONTEXT) {
-    final AuthService authService = AuthService();
+  void initState() {
+    super.initState();
+    // Вызываем нашу одноразовую функцию проверки
+    _handleAuthCheck();
+  }
 
-    return StreamBuilder<User?>(
-      stream: authService.authStateChanges,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const _LoadingScreen();
-        }
+  /// Эта функция запускается ОДИН РАЗ и решает, куда
+  /// перенаправить пользователя.
+  Future<void> _handleAuthCheck() async {
+    try {
+      // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ---
+      // Мы ждем ТОЛЬКО ПЕРВОГО ответа от Firebase.
+      // Это Future, а не Stream, поэтому он выполнится 1 раз.
+      final User? user = await _authService.authStateChanges.first;
+      // ---
 
-        if (snapshot.hasData) {
-          // Пользователь ВОШЕЛ.
-          // Сначала синхронизируем данные, потом проверяем онбординг.
-          return FutureBuilder<bool>(
-            future: _syncAndCheckOnboarding(),
-            builder: (context, onboardingSnapshot) {
-              if (onboardingSnapshot.connectionState == ConnectionState.waiting) {
-                return const _LoadingScreen();
-              }
+      // Убедимся, что виджет не был удален, пока мы ждали
+      if (!mounted) return;
 
-              final bool isOnboardingComplete = onboardingSnapshot.data ?? false;
+      if (user == null) {
+        // --- СЛУЧАЙ 1: Пользователь НЕ вошел ---
+        print('🔒 AuthGate: Пользователь не вошел. Очистка локальных данных...');
+        await _syncService.clearAllLocalData();
 
-              if (isOnboardingComplete) {
-                // Вошел И онбординг пройден -> На Главный Экран
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  Navigator.of(context).pushReplacementNamed(AppRouter.home);
-                });
-              } else {
-                // Вошел, НО онбординг не пройден -> На Онбординг
-                WidgetsBinding.instance.addPostFrameCallback((_) {
-                  Navigator.of(context).pushReplacementNamed(AppRouter.onboarding);
-                });
-              }
-              return const _LoadingScreen();
-            },
-          );
-        }
-
-        // 3. Пользователь НЕ вошел (snapshot.hasData == false)
-        WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
           Navigator.of(context).pushReplacementNamed(AppRouter.auth);
-        });
-        return const _LoadingScreen();
-      },
-    );
+        }
+      } else {
+        // --- СЛУЧАЙ 2: Пользователь ВОШЕЛ ---
+        print('✅ AuthGate: Пользователь вошел (${user.uid}). Синхронизация данных...');
+        await _syncService.syncAllFromFirestore();
+
+        if (!mounted) return;
+
+        final bool isOnboardingComplete = await _firestoreService.isOnboardingCompleteInCloud();
+
+        if (!mounted) return;
+
+        if (isOnboardingComplete) {
+          // 2a: Вошел и все настроил -> на главный экран
+          print('🏠 AuthGate: Онбординг пройден. Переход на Home.');
+          Navigator.of(context).pushReplacementNamed(AppRouter.home);
+        } else {
+          // 2b: Вошел, но онбординг не пройден -> на экран онбординга
+          print('👋 AuthGate: Онбординг не пройден. Переход на Onboarding.');
+          Navigator.of(context).pushReplacementNamed(AppRouter.onboarding);
+        }
+      }
+    } catch (e) {
+      print("❌ AuthGate: КРИТИЧЕСКАЯ ОШИБКА во время входа/синхронизации: $e");
+      if (mounted) {
+        await _syncService.clearAllLocalData();
+        Navigator.of(context).pushReplacementNamed(AppRouter.auth);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    // Нам больше не нужно отменять подписку,
+    // так как мы ее не создавали.
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Этот экран будет отображаться, пока _handleAuthCheck
+    // выполняет свою асинхронную работу.
+    return const _LoadingScreen();
   }
 }
+
 
 /// Простой экран загрузки
 class _LoadingScreen extends StatelessWidget {

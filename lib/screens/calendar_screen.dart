@@ -25,7 +25,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
   final PillService _pillService = PillService();
   final SettingsService _settingsService = SettingsService();
 
-  // ... (состояния без изменений) ...
   CyclePrediction? _prediction;
   Set<DateTime> _periodDays = {};
   Set<DateTime> _predictedPeriodDays = {};
@@ -50,7 +49,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _loadData() async {
-    // ... (без изменений) ...
     final isPillEnabled = await _settingsService.isPillTrackerEnabled();
 
     final results = await Future.wait([
@@ -104,9 +102,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   void _onDaySelected(DateTime selectedDay, DateTime focusedDay) {
-    // --- ИЗМЕНЕНИЕ: Добавляем HapticFeedback (Улучшение №2) ---
     HapticFeedback.lightImpact();
-    // ---
 
     final normalizedSelectedDay = _normalizeDate(selectedDay);
 
@@ -137,7 +133,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   void _onDayLongPressed(DateTime selectedDay, DateTime focusedDay) {
-    // ... (без изменений) ...
     HapticFeedback.mediumImpact();
     if (selectedDay.isAfter(DateTime.now())) {
       return;
@@ -146,18 +141,28 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   void _showSymptomSheetForDate(DateTime date) {
-    // ... (без изменений) ...
     if (!mounted) return;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
+        return Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
           ),
-          child: SymptomSheet(
-            selectedDate: date,
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: SymptomSheet(
+              selectedDate: date,
+            ),
           ),
         );
       },
@@ -167,15 +172,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _saveAndReload() async {
-    // ... (без изменений) ...
     await _cycleService.savePeriodDays(_periodDays.toList());
     await _cycleService.saveBleedingDays(_bleedingDays.toList());
-
     await _loadData();
   }
 
   Widget _buildCalendarDay(BuildContext context, DateTime day, DateTime focusedDay, AppLocalizations l10n, ColorScheme colors) {
-    // ... (без изменений) ...
     final normalizedDay = _normalizeDate(day);
     bool isSelected = isSameDay(_selectedDay, normalizedDay);
     bool isToday = isSameDay(normalizedDay, _normalizeDate(DateTime.now()));
@@ -255,184 +257,263 @@ class _CalendarScreenState extends State<CalendarScreen> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    // --- ИЗМЕНЕНИЕ: Флаг для "пустого" состояния ---
     final bool isEmpty = _periodDays.isEmpty && _bleedingDays.isEmpty && _prediction == null;
-    // ---
 
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          children: [
-            TableCalendar(
-              // ... (все свойства TableCalendar без изменений) ...
-              locale: l10n.localeName,
-              firstDay: DateTime.utc(2020, 1, 1),
-              lastDay: DateTime.utc(2030, 12, 31),
-              focusedDay: _focusedDay,
-              selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
-              onDaySelected: _onDaySelected,
-              onDayLongPressed: _onDayLongPressed,
-              onPageChanged: (focusedDay) {
-                setState(() {
-                  _focusedDay = focusedDay;
-                });
-                _loadData();
-              },
-              calendarStyle: const CalendarStyle(
-                markerDecoration: BoxDecoration(),
-                todayDecoration: BoxDecoration(),
-                selectedDecoration: BoxDecoration(),
-                defaultDecoration: BoxDecoration(),
-                weekendDecoration: BoxDecoration(),
-                outsideDecoration: BoxDecoration(),
-              ),
-              headerStyle: HeaderStyle(
-                titleCentered: true,
-                titleTextStyle: theme.textTheme.titleLarge!,
-                formatButtonVisible: false,
-              ),
-              calendarBuilders: CalendarBuilders(
-                defaultBuilder: (context, day, focusedDay) {
-                  return _buildCalendarDay(context, day, focusedDay, l10n, colors);
-                },
-                todayBuilder: (context, day, focusedDay) {
-                  return _buildCalendarDay(context, day, focusedDay, l10n, colors);
-                },
-                selectedBuilder: (context, day, focusedDay) {
-                  return _buildCalendarDay(context, day, focusedDay, l10n, colors);
-                },
-                outsideBuilder: (context, day, focusedDay) {
-                  return Opacity(
-                    opacity: 0.4,
-                    child: _buildCalendarDay(context, day, focusedDay, l10n, colors),
-                  );
-                },
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // --- ИЗМЕНЕНИЕ: "Пустое состояние" Календаря (Улучшение №1) ---
-            if (isEmpty)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 24.0),
-                child: Text(
-                  l10n.calendarEmptyState,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              )
-            else
-              Column(
-                children: [
-                  Text(
-                    l10n.tapToLogPeriod,
-                    style: theme.textTheme.bodySmall,
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    l10n.calendarLongPressHint,
-                    style: theme.textTheme.bodySmall,
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            // ---
-
-            const Divider(height: 32),
-
-            // --- (Остальная Легенда без изменений) ---
-            _LegendItem(
-              color: colors.primary,
-              label: l10n.calendarLegendPeriod,
-            ),
-            if (_isPillTrackerEnabled)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: _LegendItem(
-                  color: colors.primaryContainer,
-                  label: l10n.calendarLegendBleeding,
-                ),
-              ),
-            const SizedBox(height: 8),
-            _LegendItem(
-              color: colors.secondaryContainer.withOpacity(0.5),
-              label: l10n.calendarLegendFertile,
-            ),
-            const SizedBox(height: 8),
-            _LegendItem(
-              color: Colors.transparent,
-              borderColor: colors.primary.withOpacity(0.7),
-              label: l10n.calendarLegendPredicted,
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Container(
-                  width: 24,
-                  height: 24,
-                  alignment: Alignment.bottomCenter,
-                  child: Container(
-                    width: 5,
-                    height: 5,
-                    decoration: BoxDecoration(
-                      color: theme.textTheme.bodyMedium?.color,
-                      shape: BoxShape.circle,
+      // --- УЛУЧШЕНИЕ: Градиентный фон ---
+      backgroundColor: theme.colorScheme.background,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.colorScheme.background,
+              theme.colorScheme.background,
+              theme.colorScheme.surface.withOpacity(0.3),
+            ],
+            stops: const [0.0, 0.6, 1.0],
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          child: Column(
+            children: [
+              // --- УЛУЧШЕНИЕ: Карточка для календаря ---
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(24),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 20,
+                      offset: const Offset(0, 8),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Text(l10n.symptomsTitle, style: theme.textTheme.bodyMedium),
-              ],
-            ),
-            if (_isPillTrackerEnabled)
-              Padding(
-                padding: const EdgeInsets.only(top: 8.0),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 24,
-                      height: 24,
-                      alignment: Alignment.topCenter,
-                      child: Icon(
-                        Icons.medication_outlined,
-                        size: 14,
-                        color: theme.textTheme.bodyMedium?.color,
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: TableCalendar(
+                    locale: l10n.localeName,
+                    firstDay: DateTime.utc(2020, 1, 1),
+                    lastDay: DateTime.utc(2030, 12, 31),
+                    focusedDay: _focusedDay,
+                    selectedDayPredicate: (day) => isSameDay(_selectedDay, day),
+                    onDaySelected: _onDaySelected,
+                    onDayLongPressed: _onDayLongPressed,
+                    onPageChanged: (focusedDay) {
+                      setState(() {
+                        _focusedDay = focusedDay;
+                      });
+                      _loadData();
+                    },
+                    calendarStyle: CalendarStyle(
+                      markerDecoration: BoxDecoration(),
+                      todayDecoration: BoxDecoration(
+                        color: colors.primary.withOpacity(0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      selectedDecoration: BoxDecoration(
+                        color: colors.primary.withOpacity(0.2),
+                        shape: BoxShape.circle,
+                      ),
+                      defaultDecoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                      ),
+                      weekendDecoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                      ),
+                      outsideDecoration: BoxDecoration(
+                        shape: BoxShape.circle,
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Text(l10n.calendarLegendPill, style: theme.textTheme.bodyMedium),
+                    headerStyle: HeaderStyle(
+                      titleCentered: true,
+                      titleTextStyle: theme.textTheme.titleLarge!.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      formatButtonVisible: false,
+                      leftChevronIcon: Icon(Icons.chevron_left, color: colors.primary),
+                      rightChevronIcon: Icon(Icons.chevron_right, color: colors.primary),
+                      headerPadding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    daysOfWeekStyle: DaysOfWeekStyle(
+                      weekdayStyle: theme.textTheme.bodyMedium!.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: colors.onSurface.withOpacity(0.7),
+                      ),
+                      weekendStyle: theme.textTheme.bodyMedium!.copyWith(
+                        fontWeight: FontWeight.w500,
+                        color: colors.onSurface.withOpacity(0.7),
+                      ),
+                    ),
+                    calendarBuilders: CalendarBuilders(
+                      defaultBuilder: (context, day, focusedDay) {
+                        return _buildCalendarDay(context, day, focusedDay, l10n, colors);
+                      },
+                      todayBuilder: (context, day, focusedDay) {
+                        return _buildCalendarDay(context, day, focusedDay, l10n, colors);
+                      },
+                      selectedBuilder: (context, day, focusedDay) {
+                        return _buildCalendarDay(context, day, focusedDay, l10n, colors);
+                      },
+                      outsideBuilder: (context, day, focusedDay) {
+                        return Opacity(
+                          opacity: 0.4,
+                          child: _buildCalendarDay(context, day, focusedDay, l10n, colors),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // --- УЛУЧШЕНИЕ: Красивое пустое состояние ---
+              if (isEmpty)
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(
+                        Icons.calendar_today_outlined,
+                        size: 48,
+                        color: theme.colorScheme.onSurface.withOpacity(0.3),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        l10n.calendarEmptyState,
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: theme.colorScheme.onSurface.withOpacity(0.7),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      Text(
+                        l10n.tapToLogPeriod,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: colors.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        l10n.calendarLongPressHint,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colors.onSurface.withOpacity(0.6),
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ),
+                ),
+
+              const SizedBox(height: 24),
+
+              // --- УЛУЧШЕНИЕ: Красивая легенда ---
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Legend',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _LegendItem(
+                      color: colors.primary,
+                      label: l10n.calendarLegendPeriod,
+                    ),
+                    if (_isPillTrackerEnabled)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12.0),
+                        child: _LegendItem(
+                          color: colors.primaryContainer,
+                          label: l10n.calendarLegendBleeding,
+                        ),
+                      ),
+                    const SizedBox(height: 12),
+                    _LegendItem(
+                      color: colors.secondaryContainer.withOpacity(0.5),
+                      label: l10n.calendarLegendFertile,
+                    ),
+                    const SizedBox(height: 12),
+                    _LegendItem(
+                      color: Colors.transparent,
+                      borderColor: colors.primary.withOpacity(0.7),
+                      label: l10n.calendarLegendPredicted,
+                    ),
+                    const SizedBox(height: 16),
+                    _LegendIconItem(
+                      icon: Icons.circle,
+                      iconSize: 5,
+                      label: l10n.symptomsTitle,
+                    ),
+                    if (_isPillTrackerEnabled)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12.0),
+                        child: _LegendIconItem(
+                          icon: Icons.medication_outlined,
+                          label: l10n.calendarLegendPill,
+                        ),
+                      ),
+                    Padding(
+                      padding: const EdgeInsets.only(top: 12.0),
+                      child: _LegendIconItem(
+                        icon: Icons.notes_rounded,
+                        label: l10n.calendarLegendNote,
+                      ),
+                    ),
                   ],
                 ),
               ),
-            Padding(
-              padding: const EdgeInsets.only(top: 8.0),
-              child: Row(
-                children: [
-                  Container(
-                    width: 24,
-                    height: 24,
-                    alignment: Alignment.center,
-                    child: Icon(
-                      Icons.notes_rounded,
-                      size: 14,
-                      color: theme.textTheme.bodyMedium?.color,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Text(l10n.calendarLegendNote, style: theme.textTheme.bodyMedium),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -441,7 +522,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
 
 /// Виджет для одного пункта в легенде
 class _LegendItem extends StatelessWidget {
-// ... (без изменений) ...
   final Color color;
   final String label;
   final Color? borderColor;
@@ -454,14 +534,15 @@ class _LegendItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Row(
       children: [
         Container(
-          width: 24,
-          height: 24,
+          width: 20,
+          height: 20,
           decoration: BoxDecoration(
             color: color,
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(6),
             border: Border.all(
               color: borderColor ?? color,
               width: 2,
@@ -469,7 +550,55 @@ class _LegendItem extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 12),
-        Text(label, style: Theme.of(context).textTheme.bodyMedium),
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.8),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Виджет для иконок в легенде
+class _LegendIconItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final double? iconSize;
+
+  const _LegendIconItem({
+    required this.icon,
+    required this.label,
+    this.iconSize,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Container(
+          width: 20,
+          height: 20,
+          alignment: Alignment.center,
+          child: Icon(
+            icon,
+            size: iconSize ?? 14,
+            color: theme.colorScheme.onSurface.withOpacity(0.7),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.8),
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -477,7 +606,6 @@ class _LegendItem extends StatelessWidget {
 
 /// Виджет для одного дня в календаре
 class _DayMarker extends StatelessWidget {
-// ... (без изменений) ...
   final String day;
   final Color color;
   final Color textColor;
@@ -505,41 +633,53 @@ class _DayMarker extends StatelessWidget {
     final colors = Theme.of(context).colorScheme;
 
     BoxBorder? border;
+    Color finalTextColor = textColor;
+
     if (isSelected) {
       border = Border.all(color: colors.primary, width: 2);
+      finalTextColor = colors.primary;
     } else if (borderColor != null) {
       border = Border.all(color: borderColor!, width: 2);
     } else if (isToday) {
-      border = Border.all(color: colors.secondary, width: 1.5);
+      border = Border.all(color: colors.primary.withOpacity(0.5), width: 1.5);
+      finalTextColor = colors.primary;
     }
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      margin: const EdgeInsets.all(4.0),
+      margin: const EdgeInsets.all(2.0),
       decoration: BoxDecoration(
         color: color,
         borderRadius: BorderRadius.circular(12),
         border: border,
+        boxShadow: isSelected ? [
+          BoxShadow(
+            color: colors.primary.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ] : null,
       ),
       child: Stack(
         alignment: Alignment.center,
         children: [
           if (hasNote)
             Positioned(
-                top: 4,
-                left: 4,
-                child: Icon(
-                  Icons.notes_rounded,
-                  size: 10,
-                  color: isSelected ? colors.primary : textColor.withOpacity(0.6),
-                )
+              top: 2,
+              left: 2,
+              child: Icon(
+                Icons.notes_rounded,
+                size: 8,
+                color: isSelected ? colors.primary : finalTextColor.withOpacity(0.6),
+              ),
             ),
 
           Center(
             child: Text(
               day,
               style: TextStyle(
-                color: isSelected ? colors.primary : textColor,
+                color: finalTextColor,
+                fontSize: 12,
                 fontWeight: isSelected || isToday ? FontWeight.bold : FontWeight.normal,
               ),
             ),
@@ -547,12 +687,12 @@ class _DayMarker extends StatelessWidget {
 
           if (hasSymptoms)
             Positioned(
-              bottom: 4,
+              bottom: 2,
               child: Container(
-                width: 5,
-                height: 5,
+                width: 4,
+                height: 4,
                 decoration: BoxDecoration(
-                  color: isSelected ? colors.primary : textColor,
+                  color: isSelected ? colors.primary : finalTextColor,
                   shape: BoxShape.circle,
                 ),
               ),
@@ -560,12 +700,12 @@ class _DayMarker extends StatelessWidget {
 
           if (hasPill)
             Positioned(
-                top: 5,
-                child: Icon(
-                  Icons.medication_outlined,
-                  size: 10,
-                  color: isSelected ? colors.primary : textColor,
-                )
+              top: 2,
+              child: Icon(
+                Icons.medication_outlined,
+                size: 8,
+                color: isSelected ? colors.primary : finalTextColor,
+              ),
             ),
         ],
       ),

@@ -1,112 +1,161 @@
 // Файл: lib/services/symptom_service.dart
 
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:intl/intl.dart';
+import 'package:bloom/services/firestore_service.dart';
 
 class SymptomService {
-  // Ключи для SharedPreferences
-  static const String _prefix = 'symptoms_';
-  // --- ИЗМЕНЕНИЕ: Новые ключи для Заметок ---
-  static const String _notePrefix = 'note_';
-  static const String _allNoteDaysKey = 'allNoteDays';
-  // ---
-  static const String _allSymptomDaysKey = 'allSymptomDays';
+  final FirestoreService _firestore = FirestoreService();
 
-  String _getKey(DateTime date, String prefix) {
-    final dateString = DateFormat('yyyy-MM-dd').format(date);
-    return '$prefix$dateString';
+  // Ключи для SharedPreferences
+  static const String _symptomsKey = 'symptoms';
+  static const String _notesKey = 'notes'; // <-- НОВЫЙ КЛЮЧ
+
+  // ---
+  // --- МЕТОДЫ ДЛЯ СИМПТОМОВ ---
+  // ---
+
+  /// Возвращает все симптомы за конкретный день
+  Future<Set<String>> getSymptoms(DateTime date) async {
+    final allSymptoms = await _getAllSymptoms();
+    final dateKey = _normalizeDate(date);
+    return allSymptoms[dateKey]?.toSet() ?? {};
   }
+
+  /// Сохраняет симптомы за конкретный день
+  Future<void> saveSymptoms(DateTime date, Set<String> symptoms) async {
+    final allSymptoms = await _getAllSymptoms();
+    final dateKey = _normalizeDate(date);
+
+    if (symptoms.isEmpty) {
+      allSymptoms.remove(dateKey);
+    } else {
+      allSymptoms[dateKey] = symptoms.toList();
+    }
+
+    await _saveAllSymptoms(allSymptoms);
+
+    // TODO: Добавить бэкап в Firestore
+    // await _firestore.updateUserSymptomData(allSymptoms);
+  }
+
+  // ---
+  // --- НОВЫЕ МЕТОДЫ ДЛЯ ЗАМЕТОК ---
+  // ---
+
+  /// Возвращает заметку за конкретный день
+  Future<String> getNote(DateTime date) async {
+    final allNotes = await _getAllNotes();
+    final dateKey = _normalizeDate(date);
+    return allNotes[dateKey] ?? "";
+  }
+
+  /// Сохраняет заметку за конкретный день
+  Future<void> saveNote(DateTime date, String note) async {
+    final allNotes = await _getAllNotes();
+    final dateKey = _normalizeDate(date);
+
+    if (note.isEmpty) {
+      allNotes.remove(dateKey);
+    } else {
+      allNotes[dateKey] = note;
+    }
+
+    await _saveAllNotes(allNotes);
+
+    // TODO: Добавить бэкап в Firestore
+    // await _firestore.updateUserNoteData(allNotes);
+  }
+
+  // ---
+  // --- НОВЫЕ МЕТОДЫ ДЛЯ КАЛЕНДАРЯ ---
+  // ---
+
+  /// Возвращает Set дат, в которых есть симптомы
+  Future<Set<String>> getSymptomDaysIndex() async {
+    final allSymptoms = await _getAllSymptoms();
+    return allSymptoms.keys.toSet();
+  }
+
+  /// Возвращает Set дат, в которых есть заметки
+  Future<Set<String>> getNoteDaysIndex() async {
+    final allNotes = await _getAllNotes();
+    return allNotes.keys.toSet();
+  }
+
+  // ---
+  // --- ВНУТРЕННИЕ ХЕЛПЕРЫ ---
+  // ---
 
   String _normalizeDate(DateTime date) {
-    return DateFormat('yyyy-MM-dd').format(date);
+    return "${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}";
   }
 
-  /// Сохраняет набор симптомов (и настроений) для определенной даты
-  Future<void> saveSymptoms(DateTime date, Set<String> symptoms) async {
+  // Хелперы для симптомов (Map<String, List<String>>)
+  Future<Map<String, List<String>>> _getAllSymptoms() async {
     final prefs = await SharedPreferences.getInstance();
-    final key = _getKey(date, _prefix);
+    final jsonString = prefs.getString(_symptomsKey);
+    if (jsonString == null) return {};
+    try {
+      final decodedMap = jsonDecode(jsonString) as Map<String, dynamic>;
+      return decodedMap.map((key, value) {
+        final list = (value as List<dynamic>).map((item) => item.toString()).toList();
+        return MapEntry(key, list);
+      });
+    } catch (e) { return {}; }
+  }
+  Future<void> _saveAllSymptoms(Map<String, List<String>> allSymptoms) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_symptomsKey, jsonEncode(allSymptoms));
+  }
 
-    await prefs.setStringList(key, symptoms.toList());
+  // Хелперы для заметок (Map<String, String>)
+  Future<Map<String, String>> _getAllNotes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final jsonString = prefs.getString(_notesKey);
+    if (jsonString == null) return {};
+    try {
+      return Map<String, String>.from(jsonDecode(jsonString));
+    } catch (e) { return {}; }
+  }
+  Future<void> _saveAllNotes(Map<String, String> allNotes) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_notesKey, jsonEncode(allNotes));
+  }
 
-    // Обновляем индекс дней с СИМПТОМАМИ
-    final dateString = _normalizeDate(date);
-    final index = (prefs.getStringList(_allSymptomDaysKey) ?? []).toSet();
+  // ---
+  // --- ОБНОВЛЕННЫЕ МЕТОДЫ СИНХРОНИЗАЦИИ ---
+  // ---
 
-    if (symptoms.isNotEmpty && !index.contains(dateString)) {
-      index.add(dateString);
-    } else if (symptoms.isEmpty && index.contains(dateString)) {
-      index.remove(dateString);
+  /// Скачивает симптомы И заметки из Firestore
+  Future<void> syncFromFirestore() async {
+    print("🔄 Синхронизация SymptomService...");
+    final prefs = await SharedPreferences.getInstance();
+
+    // 1. Синхронизируем СИМПТОМЫ
+    final Map<String, dynamic>? symptomData = await _firestore.getUserSymptomData();
+    if (symptomData != null) {
+      final allSymptoms = symptomData.map((key, value) {
+        final list = (value as List<dynamic>).map((item) => item.toString()).toList();
+        return MapEntry(key, list);
+      });
+      await prefs.setString(_symptomsKey, jsonEncode(allSymptoms));
     }
 
-    await prefs.setStringList(_allSymptomDaysKey, index.toList());
-  }
-
-  /// Получает набор симптомов для определенной даты
-  Future<Set<String>> getSymptoms(DateTime date) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = _getKey(date, _prefix);
-    final symptomsList = prefs.getStringList(key);
-    if (symptomsList == null) {
-      return <String>{};
+    // 2. Синхронизируем ЗАМЕТКИ (предполагаем, что они хранятся как Map<String, String>)
+    final Map<String, dynamic>? noteData = await _firestore.getUserNoteData();
+    if (noteData != null) {
+      final allNotes = noteData.map((key, value) => MapEntry(key, value.toString()));
+      await prefs.setString(_notesKey, jsonEncode(allNotes));
     }
-    return symptomsList.toSet();
   }
 
-  /// Возвращает Set всех дат, у которых есть симптомы
-  Future<Set<DateTime>> getSymptomDaysIndex() async {
+  /// Очищает локальные симптомы И заметки
+  Future<void> clearLocalData() async {
+    print("🧹 Очистка SymptomService...");
     final prefs = await SharedPreferences.getInstance();
-    final index = prefs.getStringList(_allSymptomDaysKey) ?? [];
 
-    return index
-        .map((dateString) => DateTime.tryParse(dateString))
-        .where((date) => date != null)
-        .cast<DateTime>()
-        .toSet();
+    await prefs.remove(_symptomsKey);
+    await prefs.remove(_notesKey); // <-- ОБНОВЛЕНО
   }
-
-  // --- ИЗМЕНЕНИЕ: Новые методы для Заметок ---
-
-  /// Сохраняет текстовую заметку для даты
-  Future<void> saveNote(DateTime date, String note) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = _getKey(date, _notePrefix);
-
-    // 1. Сохраняем заметку
-    await prefs.setString(key, note);
-
-    // 2. Обновляем индекс дней с ЗАМЕТКАМИ
-    final dateString = _normalizeDate(date);
-    final index = (prefs.getStringList(_allNoteDaysKey) ?? []).toSet();
-
-    // Если заметка не пустая - добавляем в индекс
-    if (note.trim().isNotEmpty && !index.contains(dateString)) {
-      index.add(dateString);
-    }
-    // Если заметка стала пустой - удаляем из индекса
-    else if (note.trim().isEmpty && index.contains(dateString)) {
-      index.remove(dateString);
-    }
-
-    await prefs.setStringList(_allNoteDaysKey, index.toList());
-  }
-
-  /// Получает заметку для даты
-  Future<String> getNote(DateTime date) async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = _getKey(date, _notePrefix);
-    return prefs.getString(key) ?? ""; // Возвращаем пустую строку, если null
-  }
-
-  /// Возвращает Set всех дат, у которых есть заметки
-  Future<Set<DateTime>> getNoteDaysIndex() async {
-    final prefs = await SharedPreferences.getInstance();
-    final index = prefs.getStringList(_allNoteDaysKey) ?? [];
-
-    return index
-        .map((dateString) => DateTime.tryParse(dateString))
-        .where((date) => date != null)
-        .cast<DateTime>()
-        .toSet();
-  }
-// ---
 }

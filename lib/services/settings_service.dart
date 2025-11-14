@@ -21,15 +21,17 @@ class SettingsService {
   static const String _keyPillPlaceboDays = 'pillPlaceboDays';
 
   // --- ИЗМЕНЕНИЕ: Новые ключи для настроек цикла ---
-  // (Мы переносим их из cycle_service)
   static const String _keyAvgCycleLengthManual = 'avgCycleLengthManual';
   static const String _keyAvgPeriodLengthManual = 'avgPeriodLengthManual';
   // ---
 
+  // ---
+  // --- НОВЫЕ МЕТОДЫ ДЛЯ СИНХРОНИЗАЦИИ ---
+  // ---
 
-  // --- ИЗМЕНЕНИЕ: Новый метод "Скачивания" ---
   /// Скачивает все настройки из Firestore и сохраняет их в SharedPreferences
   Future<void> syncFromFirestore() async {
+    print("🔄 Синхронизация SettingsService...");
     final data = await _firestore.loadSettings();
     if (data == null) return; // Нет данных в облаке
 
@@ -71,9 +73,28 @@ class SettingsService {
       await prefs.setInt(_keyAvgPeriodLengthManual, data[_keyAvgPeriodLengthManual]);
     }
   }
-  // ---
 
-  // --- ИЗМЕНЕНИЕ: Все 'set' методы теперь вызывают _firestore.saveSettings ---
+  /// Очищает локальные настройки при выходе
+  Future<void> clearLocalData() async {
+    print("🧹 Очистка SettingsService...");
+    final prefs = await SharedPreferences.getInstance();
+
+    await prefs.remove(_keyNotificationsEnabled);
+    await prefs.remove(_keyAppLocale);
+    await prefs.remove(_keyAppTheme);
+    await prefs.remove(_keyUseManualCycleLength);
+    await prefs.remove(_keyIsPillTrackerEnabled);
+    await prefs.remove(_keyPillReminderTime);
+    await prefs.remove(_keyPillPackStartDate);
+    await prefs.remove(_keyPillActiveDays);
+    await prefs.remove(_keyPillPlaceboDays);
+    await prefs.remove(_keyAvgCycleLengthManual);
+    await prefs.remove(_keyAvgPeriodLengthManual);
+  }
+
+  // ---
+  // --- ОБЫЧНЫЕ МЕТОДЫ (С БЭКАПОМ В FIRESTORE) ---
+  // ---
 
   Future<void> setNotificationsEnabled(bool isEnabled) async {
     final prefs = await SharedPreferences.getInstance();
@@ -192,7 +213,6 @@ class SettingsService {
     return prefs.getInt(_keyPillPlaceboDays) ?? 7;
   }
 
-  // --- ИЗМЕНЕНИЕ: Новые методы (перенесены из cycle_service) ---
   Future<void> saveManualAvgCycleLength(int length) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyAvgCycleLengthManual, length);
@@ -211,5 +231,4 @@ class SettingsService {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getInt(_keyAvgPeriodLengthManual) ?? 5;
   }
-// ---
 }

@@ -21,18 +21,16 @@ class CycleService {
   static const String _keyIsBleedingActive = 'isBleedingActive';
   static const String _keyActiveBleedingStart = 'activeBleedingStart';
 
-  // --- ИЗМЕНЕНИЕ: УДАЛЕНЫ КЛЮЧИ НАСТРОЕК ---
-  // static const String _keyAvgCycleLengthManual = 'avgCycleLengthManual';
-  // static const String _keyOnboardingComplete = 'onboardingComplete';
-  // static const String _keyAvgPeriodLengthManual = 'avgPeriodLengthManual';
-  // ---
-
   // --- (Методы для _periodDays: savePeriodDays, getPeriodDays) ---
   Future<void> savePeriodDays(List<DateTime> dates) async {
     final prefs = await SharedPreferences.getInstance();
     final dateStrings = dates.map((date) => date.toString()).toList();
     await prefs.setStringList(_keyPeriodDays, dateStrings);
+
     // TODO: Добавить бэкап в Firestore
+    // await _firestore.updateUserCycleData({
+    //   _keyPeriodDays: dateStrings,
+    // });
   }
   Future<List<DateTime>> getPeriodDays() async {
     final prefs = await SharedPreferences.getInstance();
@@ -60,9 +58,15 @@ class CycleService {
   }
   Future<void> startPeriod(DateTime startDate) async {
     final prefs = await SharedPreferences.getInstance();
+    final isoDate = startDate.toIso8601String();
     await prefs.setBool(_keyIsPeriodActive, true);
-    await prefs.setString(_keyActivePeriodStart, startDate.toIso8601String());
+    await prefs.setString(_keyActivePeriodStart, isoDate);
+
     // TODO: Добавить бэкап в Firestore
+    // await _firestore.updateUserCycleData({
+    //   _keyIsPeriodActive: true,
+    //   _keyActivePeriodStart: isoDate,
+    // });
   }
   Future<void> endPeriod() async {
     final prefs = await SharedPreferences.getInstance();
@@ -87,7 +91,12 @@ class CycleService {
     }
     await prefs.setBool(_keyIsPeriodActive, false);
     await prefs.remove(_keyActivePeriodStart);
-    // TODO: Добавить бэкап в Firestore
+
+    // TODO: Добавить бэкап в Firestore (savePeriodDays уже должен был это сделать)
+    // await _firestore.updateUserCycleData({
+    //   _keyIsPeriodActive: false,
+    //   _keyActivePeriodStart: FieldValue.delete(), // Удалить поле в Firestore
+    // });
   }
   // ---
 
@@ -96,7 +105,11 @@ class CycleService {
     final prefs = await SharedPreferences.getInstance();
     final dateStrings = dates.map((date) => date.toString()).toList();
     await prefs.setStringList(_keyBleedingDays, dateStrings);
+
     // TODO: Добавить бэкап в Firestore
+    // await _firestore.updateUserCycleData({
+    //   _keyBleedingDays: dateStrings,
+    // });
   }
   Future<List<DateTime>> getBleedingDays() async {
     final prefs = await SharedPreferences.getInstance();
@@ -121,9 +134,15 @@ class CycleService {
   }
   Future<void> startBleeding(DateTime startDate) async {
     final prefs = await SharedPreferences.getInstance();
+    final isoDate = startDate.toIso8601String();
     await prefs.setBool(_keyIsBleedingActive, true);
-    await prefs.setString(_keyActiveBleedingStart, startDate.toIso8601String());
+    await prefs.setString(_keyActiveBleedingStart, isoDate);
+
     // TODO: Добавить бэкап в Firestore
+    // await _firestore.updateUserCycleData({
+    //   _keyIsBleedingActive: true,
+    //   _keyActiveBleedingStart: isoDate,
+    // });
   }
   Future<void> endBleeding() async {
     final prefs = await SharedPreferences.getInstance();
@@ -148,12 +167,13 @@ class CycleService {
     }
     await prefs.setBool(_keyIsBleedingActive, false);
     await prefs.remove(_keyActiveBleedingStart);
-    // TODO: Добавить бэкап в Firestore
-  }
-  // ---
 
-  // --- ИЗМЕНЕНИЕ: УДАЛЕНЫ методы save/get Manual... и onboarding... ---
-  // (Они переехали в SettingsService и FirestoreService)
+    // TODO: Добавить бэкап в Firestore (saveBleedingDays уже должен был это сделать)
+    // await _firestore.updateUserCycleData({
+    //   _keyIsBleedingActive: false,
+    //   _keyActiveBleedingStart: FieldValue.delete(), // Удалить поле в Firestore
+    // });
+  }
   // ---
 
   Future<CyclePrediction?> getCyclePredictions() async {
@@ -168,7 +188,6 @@ class CycleService {
 
     final periodGroups = _groupDays(periodDays, 2);
 
-    // --- ИЗМЕНЕНИЕ: Загружаем настройки из SettingsService ---
     final int avgPeriodLength;
     if (periodGroups.isEmpty) {
       avgPeriodLength = await settingsService.getManualAvgPeriodLength();
@@ -182,7 +201,6 @@ class CycleService {
 
     final bool useManual = await settingsService.getUseManualCycleLength();
     final int manualLength = await settingsService.getManualAvgCycleLength();
-    // ---
 
     if (useManual) {
       avgCycleLength = manualLength;
@@ -242,7 +260,7 @@ class CycleService {
       final prevDay = days[i - 1];
       final currentDay = days[i];
       if (currentDay.difference(prevDay).inDays <= maxGap) {
-        currentGroup.add(currentDay); // <-- Исправленная опечатка
+        currentGroup.add(currentDay);
       } else {
         groups.add(currentGroup);
         currentGroup = [currentDay];
@@ -250,5 +268,65 @@ class CycleService {
     }
     groups.add(currentGroup);
     return groups;
+  }
+
+  // ---
+  // --- НОВЫЕ МЕТОДЫ ДЛЯ СИНХРОНИЗАЦИИ ---
+  // ---
+
+  /// Скачивает данные цикла из Firestore и сохраняет локально
+  Future<void> syncFromFirestore() async {
+    print("🔄 Синхронизация CycleService...");
+
+    // 1. Получаем все данные по циклу из Firestore
+    // (Предполагается, что у вас есть такой метод в FirestoreService)
+    final Map<String, dynamic>? firestoreData = await _firestore.getUserCycleData();
+
+    if (firestoreData != null) {
+      final prefs = await SharedPreferences.getInstance();
+
+      // 2. Восстанавливаем данные о месячных
+      // (Обратите внимание на безопасное приведение типов из Firestore)
+      final periodDays = (firestoreData[_keyPeriodDays] as List<dynamic>?)
+          ?.map((d) => d.toString()) // Предполагаем, что в Firestore они хранятся как String или Timestamp
+          .toList() ?? [];
+      await prefs.setStringList(_keyPeriodDays, periodDays);
+
+      await prefs.setBool(_keyIsPeriodActive, firestoreData[_keyIsPeriodActive] ?? false);
+
+      if (firestoreData[_keyActivePeriodStart] != null) {
+        await prefs.setString(_keyActivePeriodStart, firestoreData[_keyActivePeriodStart].toString());
+      } else {
+        await prefs.remove(_keyActivePeriodStart);
+      }
+
+      // 3. Восстанавливаем данные о кровотечении
+      final bleedingDays = (firestoreData[_keyBleedingDays] as List<dynamic>?)
+          ?.map((d) => d.toString())
+          .toList() ?? [];
+      await prefs.setStringList(_keyBleedingDays, bleedingDays);
+
+      await prefs.setBool(_keyIsBleedingActive, firestoreData[_keyIsBleedingActive] ?? false);
+
+      if (firestoreData[_keyActiveBleedingStart] != null) {
+        await prefs.setString(_keyActiveBleedingStart, firestoreData[_keyActiveBleedingStart].toString());
+      } else {
+        await prefs.remove(_keyActiveBleedingStart);
+      }
+    }
+  }
+
+  /// Очищает локальные данные цикла при выходе
+  Future<void> clearLocalData() async {
+    print("🧹 Очистка CycleService...");
+    final prefs = await SharedPreferences.getInstance();
+
+    // Удаляем все ключи, за которые отвечает этот сервис
+    await prefs.remove(_keyPeriodDays);
+    await prefs.remove(_keyIsPeriodActive);
+    await prefs.remove(_keyActivePeriodStart);
+    await prefs.remove(_keyBleedingDays);
+    await prefs.remove(_keyIsBleedingActive);
+    await prefs.remove(_keyActiveBleedingStart);
   }
 }

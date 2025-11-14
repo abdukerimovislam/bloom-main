@@ -46,7 +46,6 @@ class _PillScreenState extends State<PillScreen> {
   }
 
   Future<void> _loadData() async {
-    // ... (без изменений) ...
     if (!mounted) return;
     setState(() { _isLoading = true; });
 
@@ -80,21 +79,18 @@ class _PillScreenState extends State<PillScreen> {
   }
 
   Future<void> _takePill() async {
-    // ... (без изменений) ...
     HapticFeedback.lightImpact();
     await _pillService.savePillTaken(DateTime.now());
     _loadData();
   }
 
   void _openInfoScreen() {
-    // ... (без изменений) ...
     Navigator.of(context).push(
       MaterialPageRoute(builder: (context) => const PillInfoScreen()),
     );
   }
 
   void _onPillTrackerEnabledChanged(bool value) async {
-    // ... (без изменений) ...
     setState(() { _isPillTrackerEnabled = value; });
     await _settingsService.setIsPillTrackerEnabled(value);
 
@@ -114,11 +110,23 @@ class _PillScreenState extends State<PillScreen> {
   }
 
   void _showPillTimePicker() async {
-    // ... (без изменений) ...
     final l10n = AppLocalizations.of(context)!;
     final TimeOfDay? newTime = await showTimePicker(
       context: context,
       initialTime: _pillReminderTime ?? const TimeOfDay(hour: 21, minute: 0),
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).colorScheme.primary,
+              onPrimary: Colors.white,
+              surface: Theme.of(context).colorScheme.surface,
+              onSurface: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
 
     if (newTime != null) {
@@ -137,12 +145,24 @@ class _PillScreenState extends State<PillScreen> {
   }
 
   Future<void> _selectStartDate(BuildContext context) async {
-    // ... (без изменений) ...
     final DateTime? picked = await showDatePicker(
       context: context,
       initialDate: _selectedStartDate,
       firstDate: DateTime.now().subtract(const Duration(days: 40)),
       lastDate: DateTime.now().add(const Duration(days: 40)),
+      builder: (BuildContext context, Widget? child) {
+        return Theme(
+          data: Theme.of(context).copyWith(
+            colorScheme: ColorScheme.light(
+              primary: Theme.of(context).colorScheme.primary,
+              onPrimary: Colors.white,
+              surface: Theme.of(context).colorScheme.surface,
+              onSurface: Theme.of(context).colorScheme.onSurface,
+            ),
+          ),
+          child: child!,
+        );
+      },
     );
     if (picked != null && picked != _selectedStartDate) {
       setState(() {
@@ -152,7 +172,6 @@ class _PillScreenState extends State<PillScreen> {
   }
 
   Future<void> _savePackSettings() async {
-    // ... (без изменений) ...
     final int active = int.tryParse(_activeDaysController.text) ?? 21;
     final int placebo = int.tryParse(_placeboDaysController.text) ?? 7;
 
@@ -172,20 +191,31 @@ class _PillScreenState extends State<PillScreen> {
   }
 
   Future<void> _showResetPackDialog() async {
-    // ... (без изменений) ...
     final l10n = AppLocalizations.of(context)!;
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(l10n.pillResetTitle),
-        content: Text(l10n.pillResetDesc),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text(l10n.pillResetTitle, style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontWeight: FontWeight.w600,
+        )),
+        content: Text(l10n.pillResetDesc, style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+        )),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.dialogCancel),
+            child: Text(l10n.dialogCancel, style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            )),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
             child: Text(l10n.pillResetButton),
           ),
         ],
@@ -204,133 +234,308 @@ class _PillScreenState extends State<PillScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
+      // --- ДОБАВЛЕНИЕ: AppBar для экрана таблеток ---
       appBar: AppBar(
         automaticallyImplyLeading: false,
-        title: Text(l10n.pillTrackerTabTitle),
+        title: Text(
+          l10n.pillTrackerTabTitle,
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        elevation: 0,
+        backgroundColor: Colors.transparent,
+        foregroundColor: theme.colorScheme.onBackground,
         actions: [
           if (_isPillTrackerEnabled && _packStartDate != null)
             IconButton(
-              icon: const Icon(Icons.refresh),
+              icon: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.refresh, size: 20, color: theme.colorScheme.primary),
+              ),
               tooltip: l10n.pillResetButton,
               onPressed: _showResetPackDialog,
             ),
           IconButton(
-            icon: const Icon(Icons.info_outline),
+            icon: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.info_outline, size: 20, color: theme.colorScheme.primary),
+            ),
             onPressed: _openInfoScreen,
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24.0),
-        child: Column(
-          children: [
-            SwitchListTile(
-              title: Text(
-                  l10n.settingsPillTrackerEnable,
-                  style: theme.textTheme.titleMedium
+
+      // --- УЛУЧШЕНИЕ: Градиентный фон ---
+      backgroundColor: theme.colorScheme.background,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.colorScheme.background,
+              theme.colorScheme.background,
+              theme.colorScheme.surface.withOpacity(0.3),
+            ],
+            stops: const [0.0, 0.6, 1.0],
+          ),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            children: [
+              // --- УЛУЧШЕНИЕ: Карточка для переключателя ---
+              Container(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: SwitchListTile(
+                  title: Text(
+                    l10n.settingsPillTrackerEnable,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    l10n.settingsPillTrackerDesc,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurface.withOpacity(0.7),
+                    ),
+                  ),
+                  value: _isPillTrackerEnabled,
+                  onChanged: _onPillTrackerEnabledChanged,
+                  secondary: Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.medication_outlined, color: theme.colorScheme.primary),
+                  ),
+                  controlAffinity: ListTileControlAffinity.trailing,
+                ),
               ),
-              value: _isPillTrackerEnabled,
-              onChanged: _onPillTrackerEnabledChanged,
-              // --- ИСПРАВЛЕНИЕ 1: Иконка ---
-              secondary: Icon(Icons.medication_outlined, color: theme.colorScheme.primary),
-              // ---
-              controlAffinity: ListTileControlAffinity.trailing,
-            ),
 
-            const Divider(height: 32),
+              const SizedBox(height: 24),
 
-            if (_isLoading)
-              const Center(child: CircularProgressIndicator())
-            else if (_isPillTrackerEnabled)
-              _packStartDate == null
-                  ? _buildSetupForm(l10n, theme)
-                  : _buildBlisterView(l10n, theme)
-            else
-              _buildDisabledState(l10n, theme),
-          ],
+              if (_isLoading)
+                Container(
+                  padding: const EdgeInsets.all(40),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.05),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Center(child: CircularProgressIndicator()),
+                )
+              else if (_isPillTrackerEnabled)
+                _packStartDate == null
+                    ? _buildSetupForm(l10n, theme)
+                    : _buildBlisterView(l10n, theme)
+              else
+                _buildDisabledState(l10n, theme),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _buildDisabledState(AppLocalizations l10n, ThemeData theme) {
-    // ... (без изменений) ...
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Lottie.asset(
+    return Container(
+      padding: const EdgeInsets.all(32),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Lottie.asset(
             'assets/lottie/avatar_welcome.json',
             width: 200,
-            height: 200
-        ),
-        const SizedBox(height: 24),
-        Text(
-          l10n.settingsPillTrackerDesc,
-          style: theme.textTheme.bodyLarge,
-          textAlign: TextAlign.center,
-        ),
-      ],
+            height: 200,
+          ),
+          const SizedBox(height: 24),
+          Text(
+            l10n.settingsPillTrackerDesc,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.8),
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildSetupForm(AppLocalizations l10n, ThemeData theme) {
-    // ... (без изменений) ...
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(l10n.pillSetupTitle, style: theme.textTheme.headlineSmall),
-        const SizedBox(height: 8),
-        Text(l10n.pillSetupDesc, style: theme.textTheme.bodyLarge),
-        const SizedBox(height: 24),
-
-        Text(l10n.pillSetupStartDate, style: theme.textTheme.titleMedium),
-        const SizedBox(height: 8),
-        ListTile(
-          title: Text(DateFormat.yMMMd(l10n.localeName).format(_selectedStartDate)),
-          trailing: const Icon(Icons.calendar_month_outlined),
-          onTap: () => _selectStartDate(context),
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-              side: BorderSide(color: theme.colorScheme.outline)
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
           ),
-        ),
-        const SizedBox(height: 16),
-
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _activeDaysController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: l10n.pillSetupActiveDays,
-                  border: const OutlineInputBorder(),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primary.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(Icons.settings_outlined, color: theme.colorScheme.primary),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  l10n.pillSetupTitle,
+                  style: theme.textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            l10n.pillSetupDesc,
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: theme.colorScheme.onSurface.withOpacity(0.7),
             ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: TextField(
-                controller: _placeboDaysController,
-                keyboardType: TextInputType.number,
-                decoration: InputDecoration(
-                  labelText: l10n.pillSetupPlaceboDays,
-                  border: const OutlineInputBorder(),
+          ),
+          const SizedBox(height: 24),
+
+          Text(
+            l10n.pillSetupStartDate,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ListTile(
+            title: Text(
+              DateFormat.yMMMd(l10n.localeName).format(_selectedStartDate),
+              style: theme.textTheme.bodyMedium,
+            ),
+            trailing: Icon(Icons.calendar_month_outlined, color: theme.colorScheme.primary),
+            onTap: () => _selectStartDate(context),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: theme.colorScheme.outline.withOpacity(0.3)),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.pillSetupActiveDays,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _activeDaysController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: '21',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-
-        ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            minimumSize: const Size(double.infinity, 50),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      l10n.pillSetupPlaceboDays,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: _placeboDaysController,
+                      keyboardType: TextInputType.number,
+                      decoration: InputDecoration(
+                        hintText: '7',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          onPressed: _savePackSettings,
-          child: Text(l10n.pillSetupSaveButton),
-        ),
-      ],
+          const SizedBox(height: 24),
+
+          FilledButton(
+            style: FilledButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+              backgroundColor: theme.colorScheme.primary,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            onPressed: _savePackSettings,
+            child: Text(
+              l10n.pillSetupSaveButton,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -340,69 +545,142 @@ class _PillScreenState extends State<PillScreen> {
 
     return Column(
       children: [
-        ListTile(
-          title: Text(l10n.settingsPillTrackerTime),
-          trailing: Text(
-            _pillReminderTime?.format(context) ?? l10n.settingsPillTrackerTimeNotSet,
-            style: TextStyle(
-              color: _pillReminderTime == null
-                  ? theme.colorScheme.error
-                  : theme.colorScheme.primary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          onTap: _showPillTimePicker,
-        ),
-
-        GridView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 16),
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 7,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-          ),
-          itemCount: totalPills,
-          itemBuilder: (context, index) {
-            final pillDate = _packStartDate!.add(Duration(days: index));
-            final isToday = isSameDay(pillDate, today);
-            final isTaken = _pillDays.contains(pillDate);
-            final isPlacebo = index >= _activeDays;
-
-            return GestureDetector(
-              onTap: (isToday && !_isTakenToday) ? _takePill : null,
-              child: _PillCircle(
-                date: pillDate,
-                isToday: isToday,
-                isTaken: isTaken,
-                isPlacebo: isPlacebo,
+        // --- УЛУЧШЕНИЕ: Карточка для времени напоминания ---
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-            );
-          },
+            ],
+          ),
+          child: ListTile(
+            leading: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.notifications_outlined, color: theme.colorScheme.primary),
+            ),
+            title: Text(
+              l10n.settingsPillTrackerTime,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            trailing: Text(
+              _pillReminderTime?.format(context) ?? l10n.settingsPillTrackerTimeNotSet,
+              style: TextStyle(
+                color: _pillReminderTime == null
+                    ? theme.colorScheme.error
+                    : theme.colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            onTap: _showPillTimePicker,
+          ),
         ),
 
-        Padding(
-          padding: const EdgeInsets.only(top: 24.0),
-          child: ElevatedButton.icon(
-            // --- ИСПРАВЛЕНИЕ 2: Иконка ---
-            icon: Icon(_isTakenToday ? Icons.check_circle : Icons.medication_outlined),
-            // ---
-            label: Text(
-              _isTakenToday ? l10n.pillAlreadyTaken : l10n.pillTakenButton,
-              style: const TextStyle(fontSize: 16),
-            ),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size(double.infinity, 50),
-              backgroundColor: _isTakenToday
-                  ? Colors.grey[400]
-                  : theme.colorScheme.primary,
-              foregroundColor: _isTakenToday
-                  ? Colors.black87
-                  : theme.colorScheme.onPrimary,
-            ),
-            onPressed: _isTakenToday ? null : _takePill,
+        const SizedBox(height: 24),
+
+        // --- УЛУЧШЕНИЕ: Карточка для блистера ---
+        Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
+          child: Column(
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primary.withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(Icons.medication_outlined, color: theme.colorScheme.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Current Pack',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              GridView.builder(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 7,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                itemCount: totalPills,
+                itemBuilder: (context, index) {
+                  final pillDate = _packStartDate!.add(Duration(days: index));
+                  final isToday = isSameDay(pillDate, today);
+                  final isTaken = _pillDays.contains(pillDate);
+                  final isPlacebo = index >= _activeDays;
+
+                  return GestureDetector(
+                    onTap: (isToday && !_isTakenToday) ? _takePill : null,
+                    child: _PillCircle(
+                      date: pillDate,
+                      isToday: isToday,
+                      isTaken: isTaken,
+                      isPlacebo: isPlacebo,
+                    ),
+                  );
+                },
+              ),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 24),
+
+        // --- УЛУЧШЕНИЕ: Кнопка принятия таблетки ---
+        FilledButton.icon(
+          icon: Icon(
+            _isTakenToday ? Icons.check_circle : Icons.medication_outlined,
+            size: 24,
+          ),
+          label: Text(
+            _isTakenToday ? l10n.pillAlreadyTaken : l10n.pillTakenButton,
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+          ),
+          style: FilledButton.styleFrom(
+            minimumSize: const Size(double.infinity, 56),
+            backgroundColor: _isTakenToday
+                ? Colors.grey[400]
+                : theme.colorScheme.primary,
+            foregroundColor: _isTakenToday
+                ? Colors.black87
+                : theme.colorScheme.onPrimary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          ),
+          onPressed: _isTakenToday ? null : _takePill,
         ),
       ],
     );
@@ -411,7 +689,6 @@ class _PillScreenState extends State<PillScreen> {
 
 /// Виджет для одного кружочка-таблетки в блистере
 class _PillCircle extends StatelessWidget {
-  // ... (без изменений) ...
   final DateTime date;
   final bool isToday;
   final bool isTaken;
@@ -454,11 +731,19 @@ class _PillCircle extends StatelessWidget {
       textColor = theme.colorScheme.onPrimary;
     }
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       decoration: BoxDecoration(
         color: color,
         shape: BoxShape.circle,
         border: border,
+        boxShadow: isToday ? [
+          BoxShadow(
+            color: theme.colorScheme.primary.withOpacity(0.3),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ] : null,
       ),
       child: Center(
         child: Text(
@@ -466,6 +751,7 @@ class _PillCircle extends StatelessWidget {
           style: TextStyle(
             color: textColor,
             fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
+            fontSize: 12,
           ),
         ),
       ),

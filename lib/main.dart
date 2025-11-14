@@ -1,4 +1,4 @@
-// Файл: lib.main.dart
+// Файл: lib/main.dart
 
 import 'package:bloom/navigation/app_router.dart';
 import 'package:bloom/models/cycle_prediction.dart';
@@ -27,6 +27,9 @@ import 'package:bloom/screens/pill_screen.dart';
 
 // --- ИЗМЕНЕНИЕ: Импорт Firebase ---
 import 'package:firebase_core/firebase_core.dart';
+import 'screens/splash_screen.dart';
+import 'screens/auth_gate.dart';
+import 'screens/splash_screen.dart';
 // ---
 
 void main() async {
@@ -75,6 +78,10 @@ class MyApp extends StatefulWidget {
 class _MyAppState extends State<MyApp> {
   Locale? _locale;
   late AppTheme _currentTheme;
+  // --- ДОБАВЛЕНИЕ: Состояние для сплеш-скрина ---
+  bool _showSplash = true;
+  // ---
+
   @override
   void initState() {
     super.initState();
@@ -83,12 +90,26 @@ class _MyAppState extends State<MyApp> {
     }
     _currentTheme = widget.savedTheme;
   }
+
   void _setLocale(Locale newLocale) {
     setState(() { _locale = newLocale; });
   }
+
   void _setTheme(AppTheme newTheme) {
     setState(() { _currentTheme = newTheme; });
   }
+
+  // --- ДОБАВЛЕНИЕ: Метод для завершения сплеш-скрина ---
+  void _completeSplash() {
+    print('✅ MyApp: Splash completed, switching to AuthGate');
+    if (mounted) {
+      setState(() {
+        _showSplash = false;
+      });
+    }
+  }
+  // ---
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -97,8 +118,10 @@ class _MyAppState extends State<MyApp> {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: _locale,
       theme: AppThemes.getThemeData(_currentTheme),
-      // --- ИЗМЕНЕНИЕ: initialRoute теперь AuthGate ---
-      initialRoute: AppRouter.authGate,
+      // --- ИЗМЕНЕНИЕ: Показываем сплеш-скрин или AuthGate ---
+      home: _showSplash
+          ? SimpleSplashScreen(onAnimationComplete: _completeSplash)
+          : const AuthGate(),
       // ---
       onGenerateRoute: (settings) => AppRouter.generateRoute(
         settings,
@@ -314,14 +337,24 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(l10n.homeConfirmStartTitle),
-        content: Text(l10n.homeConfirmStartDesc),
+        // --- УЛУЧШЕНИЕ: Более красивый диалог ---
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text(l10n.homeConfirmStartTitle, style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontWeight: FontWeight.w600,
+        )),
+        content: Text(l10n.homeConfirmStartDesc, style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+        )),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.homeConfirmNo),
+            child: Text(l10n.homeConfirmNo, style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            )),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: Text(l10n.homeConfirmYes),
           ),
@@ -353,20 +386,34 @@ class _HomeScreenState extends State<HomeScreen> {
       await _loadData();
     }
   }
+
   Future<void> _endPeriodWithConfirmation() async {
     final l10n = AppLocalizations.of(context)!;
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(l10n.homeConfirmEndTitle),
-        content: Text(l10n.homeConfirmEndDesc),
+        // --- УЛУЧШЕНИЕ: Более красивый диалог ---
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text(l10n.homeConfirmEndTitle, style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontWeight: FontWeight.w600,
+        )),
+        content: Text(l10n.homeConfirmEndDesc, style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+        )),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.homeConfirmNo),
+            child: Text(l10n.homeConfirmNo, style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            )),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
             child: Text(l10n.homeConfirmYes),
           ),
         ],
@@ -376,6 +423,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await _endPeriodInternal();
     }
   }
+
   Future<void> _endPeriodInternal() async {
     HapticFeedback.mediumImpact();
     if (mounted) {
@@ -398,14 +446,24 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(l10n.logBleedingButton),
-        content: Text(l10n.homeConfirmStartDesc),
+        // --- УЛУЧШЕНИЕ: Более красивый диалог ---
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text(l10n.logBleedingButton, style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontWeight: FontWeight.w600,
+        )),
+        content: Text(l10n.homeConfirmStartDesc, style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+        )),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.homeConfirmNo),
+            child: Text(l10n.homeConfirmNo, style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            )),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
             child: Text(l10n.homeConfirmYes),
           ),
@@ -424,20 +482,34 @@ class _HomeScreenState extends State<HomeScreen> {
       await _loadData();
     }
   }
+
   Future<void> _endBleedingWithConfirmation() async {
     final l10n = AppLocalizations.of(context)!;
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(l10n.logBleedingEndButton),
-        content: Text(l10n.homeConfirmEndDesc),
+        // --- УЛУЧШЕНИЕ: Более красивый диалог ---
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text(l10n.logBleedingEndButton, style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontWeight: FontWeight.w600,
+        )),
+        content: Text(l10n.homeConfirmEndDesc, style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+        )),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: Text(l10n.homeConfirmNo),
+            child: Text(l10n.homeConfirmNo, style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            )),
           ),
-          TextButton(
+          FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
             child: Text(l10n.homeConfirmYes),
           ),
         ],
@@ -447,6 +519,7 @@ class _HomeScreenState extends State<HomeScreen> {
       await _endBleedingInternal();
     }
   }
+
   Future<void> _endBleedingInternal() async {
     HapticFeedback.mediumImpact();
     if (mounted) {
@@ -490,13 +563,25 @@ class _HomeScreenState extends State<HomeScreen> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      // --- УЛУЧШЕНИЕ: Более красивый bottom sheet ---
       builder: (context) {
-        return Padding(
-          padding: EdgeInsets.only(
-            bottom: MediaQuery.of(context).viewInsets.bottom,
+        return Container(
+          margin: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(24),
+              topRight: Radius.circular(24),
+            ),
           ),
-          child: SymptomSheet(
-            selectedDate: DateTime.now(),
+          child: Padding(
+            padding: EdgeInsets.only(
+              bottom: MediaQuery.of(context).viewInsets.bottom,
+            ),
+            child: SymptomSheet(
+              selectedDate: DateTime.now(),
+            ),
           ),
         );
       },
@@ -535,69 +620,171 @@ class _HomeScreenState extends State<HomeScreen> {
     final theme = Theme.of(context);
 
     return Scaffold(
+      // --- ДОБАВЛЕНИЕ: AppBar для главного экрана ---
       appBar: AppBar(
-        title: Text(_getAppBarTitle(l10n)),
+        automaticallyImplyLeading: false,
+        title: Text(
+          _getAppBarTitle(l10n),
+          style: theme.textTheme.titleLarge?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
         elevation: 0,
         backgroundColor: Colors.transparent,
-        actions: const [],
+        foregroundColor: theme.colorScheme.onBackground,
       ),
-      body: _isLoading
-          ? Center(child: Lottie.asset('assets/lottie/loading_indicator.json', width: 150, height: 150,))
-          : IndexedStack(
-        index: _currentPageIndex,
-        children: [
-          _buildMainPage(),
-          const CalendarScreen(),
-          const PillScreen(),
-          SettingsScreen(
-            onLanguageChanged: widget.onLocaleChanged,
-            onThemeChanged: widget.onThemeChanged,
+
+      // --- УЛУЧШЕНИЕ: Градиентный фон ---
+      backgroundColor: theme.colorScheme.background,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              theme.colorScheme.background,
+              theme.colorScheme.background,
+              theme.colorScheme.surface.withOpacity(0.3),
+            ],
+            stops: const [0.0, 0.6, 1.0],
           ),
-        ],
+        ),
+        child: _isLoading
+            ? Center(
+          child: Lottie.asset(
+            'assets/lottie/loading_indicator.json',
+            width: 150,
+            height: 150,
+          ),
+        )
+            : IndexedStack(
+          index: _currentPageIndex,
+          children: [
+            _buildMainPage(),
+            const CalendarScreen(),
+            const PillScreen(),
+            SettingsScreen(
+              onLanguageChanged: widget.onLocaleChanged,
+              onThemeChanged: widget.onThemeChanged,
+            ),
+          ],
+        ),
       ),
+
+      // --- УЛУЧШЕНИЕ: Более красивый FAB ---
       floatingActionButton: _currentPageIndex == 0 ? AnimatedSlide(
         duration: const Duration(milliseconds: 300),
         offset: _isFabVisible ? Offset.zero : const Offset(0, 2),
         child: AnimatedOpacity(
           duration: const Duration(milliseconds: 300),
           opacity: _isFabVisible ? 1 : 0,
-          child: FloatingActionButton.extended(
-            onPressed: _showSymptomSheet,
-            icon: const Icon(Icons.sentiment_satisfied_alt_outlined),
-            label: Text(l10n.logSymptomsButton),
+          child: Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  theme.colorScheme.primary,
+                  theme.colorScheme.primaryContainer,
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: theme.colorScheme.primary.withOpacity(0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: FloatingActionButton.extended(
+              onPressed: _showSymptomSheet,
+              icon: Icon(Icons.sentiment_satisfied_alt_outlined, color: theme.colorScheme.onPrimary),
+              label: Text(l10n.logSymptomsButton, style: TextStyle(color: theme.colorScheme.onPrimary)),
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+            ),
           ),
         ),
       ) : null,
 
-      bottomNavigationBar: BottomNavigationBar(
-        items: <BottomNavigationBarItem>[
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.home_outlined),
-            activeIcon: const Icon(Icons.home),
-            label: l10n.trackYourCycle,
+      // --- УЛУЧШЕНИЕ: Более красивый BottomNavigationBar ---
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.1),
+              blurRadius: 16,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.only(
+            topLeft: Radius.circular(20),
+            topRight: Radius.circular(20),
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.calendar_month_outlined),
-            activeIcon: const Icon(Icons.calendar_month),
-            label: l10n.calendarTitle,
+          child: BottomNavigationBar(
+            items: <BottomNavigationBarItem>[
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.home_outlined),
+                activeIcon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.home, color: theme.colorScheme.primary),
+                ),
+                label: l10n.trackYourCycle,
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.calendar_month_outlined),
+                activeIcon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.calendar_month, color: theme.colorScheme.primary),
+                ),
+                label: l10n.calendarTitle,
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.medication_outlined),
+                activeIcon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.medication, color: theme.colorScheme.primary),
+                ),
+                label: l10n.pillTrackerTabTitle,
+              ),
+              BottomNavigationBarItem(
+                icon: const Icon(Icons.settings_outlined),
+                activeIcon: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.settings, color: theme.colorScheme.primary),
+                ),
+                label: l10n.settingsTitle,
+              ),
+            ],
+            currentIndex: _currentPageIndex,
+            onTap: _onItemTapped,
+            selectedItemColor: theme.colorScheme.primary,
+            unselectedItemColor: Colors.grey,
+            showUnselectedLabels: false,
+            type: BottomNavigationBarType.fixed,
+            backgroundColor: theme.colorScheme.surface,
+            elevation: 0,
           ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.medication_outlined),
-            activeIcon: const Icon(Icons.medication),
-            label: l10n.pillTrackerTabTitle,
-          ),
-          BottomNavigationBarItem(
-            icon: const Icon(Icons.settings_outlined),
-            activeIcon: const Icon(Icons.settings),
-            label: l10n.settingsTitle,
-          ),
-        ],
-        currentIndex: _currentPageIndex,
-        onTap: _onItemTapped,
-        selectedItemColor: theme.colorScheme.primary,
-        unselectedItemColor: Colors.grey,
-        showUnselectedLabels: false,
-        type: BottomNavigationBarType.fixed,
+        ),
       ),
     );
   }
@@ -613,19 +800,41 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.start,
           children: <Widget>[
             const SizedBox(height: 20),
-            CycleAvatar(
-              currentPhase: _currentPhase,
-              todaySymptoms: _todaySymptoms,
+
+            // --- УЛУЧШЕНИЕ: Контейнер для аватара с тенью ---
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.1),
+                    blurRadius: 20,
+                    offset: const Offset(0, 8),
+                  ),
+                ],
+              ),
+              child: CycleAvatar(
+                currentPhase: _currentPhase,
+                todaySymptoms: _todaySymptoms,
+              ),
             ),
 
             if (_isPeriodActive && !_isPillTrackerEnabled)
               _buildCycleProgressBar(l10n),
 
             const SizedBox(height: 20),
-            InsightCard(
-              currentPhase: _currentPhase,
-              todaySymptoms: _todaySymptoms,
-              isPillTrackerEnabled: _isPillTrackerEnabled,
+
+            // --- УЛУЧШЕНИЕ: Контейнер для InsightCard ---
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              child: InsightCard(
+                currentPhase: _currentPhase,
+                todaySymptoms: _todaySymptoms,
+                isPillTrackerEnabled: _isPillTrackerEnabled,
+              ),
             )
                 .animate()
                 .fadeIn(duration: 500.ms)
@@ -641,7 +850,11 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildPeriodStatusText(context, l10n),
 
             if (!_isPillTrackerEnabled)
-              _buildPredictionCard(context, l10n)
+            // --- УЛУЧШЕНИЕ: Контейнер для PredictionCard ---
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                child: _buildPredictionCard(context, l10n),
+              )
                   .animate()
                   .fadeIn(duration: 500.ms, delay: 200.ms)
                   .slideY(begin: 0.1, end: 0, curve: Curves.easeOut),
@@ -664,7 +877,19 @@ class _HomeScreenState extends State<HomeScreen> {
     final Color progressColor = theme.colorScheme.error;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      margin: const EdgeInsets.symmetric(horizontal: 24),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
       child: Column(
         children: [
           Row(
@@ -685,12 +910,12 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           LinearProgressIndicator(
             value: progress,
-            minHeight: 10,
-            borderRadius: BorderRadius.circular(5),
-            backgroundColor: theme.colorScheme.errorContainer.withOpacity(0.5),
+            minHeight: 12,
+            borderRadius: BorderRadius.circular(6),
+            backgroundColor: theme.colorScheme.errorContainer.withOpacity(0.3),
             valueColor: AlwaysStoppedAnimation<Color>(progressColor),
           ),
         ],
@@ -701,23 +926,49 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildTodaySymptoms(AppLocalizations l10n) {
     final theme = Theme.of(context);
     return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-      child: Wrap(
-        spacing: 8.0,
-        runSpacing: 4.0,
-        children: _todaySymptoms.map((key) {
-          return Chip(
-            label: Text(_getString(l10n, key)),
-            labelStyle: TextStyle(
-              color: theme.colorScheme.onSecondaryContainer,
-              fontWeight: FontWeight.w500,
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            "Today's Symptoms",
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
             ),
-            backgroundColor: theme.colorScheme.secondaryContainer.withOpacity(0.7),
-            side: BorderSide.none,
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          );
-        }).toList(),
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8.0,
+            runSpacing: 8.0,
+            children: _todaySymptoms.map((key) {
+              return Chip(
+                label: Text(_getString(l10n, key)),
+                labelStyle: TextStyle(
+                  color: theme.colorScheme.onSecondaryContainer,
+                  fontWeight: FontWeight.w500,
+                ),
+                backgroundColor: theme.colorScheme.secondaryContainer.withOpacity(0.7),
+                side: BorderSide.none,
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              );
+            }).toList(),
+          ),
+        ],
       ),
     );
   }
@@ -737,53 +988,57 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildPeriodButton(BuildContext context, AppLocalizations l10n) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+
     Widget buttonContent;
 
     if (_isPillTrackerEnabled) {
       if (_isBleedingActive) {
-        buttonContent = ElevatedButton.icon(
+        buttonContent = FilledButton.icon(
           icon: const Icon(Icons.stop_circle_outlined),
-          label: Text(l10n.logBleedingEndButton, style: const TextStyle(fontSize: 16)),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            backgroundColor: Colors.grey[400],
-            foregroundColor: Colors.black87,
+          label: Text(l10n.logBleedingEndButton, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            backgroundColor: colorScheme.error,
+            foregroundColor: colorScheme.onError,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
           onPressed: _endBleedingWithConfirmation,
         );
       } else {
-        buttonContent = ElevatedButton.icon(
+        buttonContent = FilledButton.icon(
           icon: const Icon(Icons.play_circle_outlined),
-          label: Text(l10n.logBleedingButton, style: const TextStyle(fontSize: 16)),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          label: Text(l10n.logBleedingButton, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
             backgroundColor: colorScheme.primary,
             foregroundColor: colorScheme.onPrimary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
           onPressed: _startBleedingWithConfirmation,
         );
       }
-    }
-    else {
+    } else {
       if (_isPeriodActive) {
-        buttonContent = ElevatedButton.icon(
+        buttonContent = FilledButton.icon(
           icon: const Icon(Icons.stop_circle_outlined),
-          label: Text(l10n.logPeriodEndButton, style: const TextStyle(fontSize: 16)),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            backgroundColor: Colors.grey[400],
-            foregroundColor: Colors.black87,
+          label: Text(l10n.logPeriodEndButton, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            backgroundColor: colorScheme.error,
+            foregroundColor: colorScheme.onError,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
           onPressed: _endPeriodWithConfirmation,
         );
       } else {
-        buttonContent = ElevatedButton.icon(
+        buttonContent = FilledButton.icon(
           icon: const Icon(Icons.play_circle_outlined),
-          label: Text(l10n.logPeriodStartButton, style: const TextStyle(fontSize: 16)),
-          style: ElevatedButton.styleFrom(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          label: Text(l10n.logPeriodStartButton, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
             backgroundColor: colorScheme.primary,
             foregroundColor: colorScheme.onPrimary,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
           onPressed: _startPeriodWithConfirmation,
         );
@@ -831,7 +1086,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Text(
           l10n.homeBleedingDay(_bleedingDayCount),
           style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.error
+            color: theme.colorScheme.error,
+            fontWeight: FontWeight.w600,
           ),
           textAlign: TextAlign.center,
         ),
@@ -844,7 +1100,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Text(
           l10n.periodIsActive(_activePeriodDayCount),
           style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.error
+            color: theme.colorScheme.error,
+            fontWeight: FontWeight.w600,
           ),
           textAlign: TextAlign.center,
         ),
@@ -857,7 +1114,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Text(
           l10n.periodDelayed(_daysDelayed),
           style: theme.textTheme.titleLarge?.copyWith(
-              color: theme.colorScheme.error
+            color: theme.colorScheme.error,
+            fontWeight: FontWeight.w600,
           ),
           textAlign: TextAlign.center,
         ),
@@ -877,13 +1135,16 @@ class _HomeScreenState extends State<HomeScreen> {
             const SizedBox(height: 16),
             Text(
               l10n.homeEmptyDesc,
-              style: Theme.of(context).textTheme.titleMedium,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: theme.colorScheme.onSurface.withOpacity(0.7),
+              ),
               textAlign: TextAlign.center,
             ),
           ],
         ),
       );
     }
+
     return const SizedBox.shrink();
   }
 
@@ -893,64 +1154,127 @@ class _HomeScreenState extends State<HomeScreen> {
         _currentPhase != CyclePhase.luteal) {
       return const SizedBox.shrink();
     }
+
     final prediction = _prediction;
+    if (prediction == null) {
+      return const SizedBox.shrink();
+    }
+
     final DateFormat formatter = DateFormat.MMMd(l10n.localeName);
-    if (prediction != null) {
+    final daysUntilNextPeriod = prediction.nextPeriodStartDate.difference(DateTime.now()).inDays;
 
-      final daysUntilNextPeriod = prediction.nextPeriodStartDate.difference(DateTime.now()).inDays;
-
-      return Card(
-        margin: const EdgeInsets.symmetric(horizontal: 16.0),
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                l10n.predictionsTitle,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                l10n.nextPeriodPrediction(daysUntilNextPeriod > 0 ? daysUntilNextPeriod : 0),
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.primary,
+    return Card(
+      margin: EdgeInsets.zero,
+      elevation: 0,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.insights_outlined, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 8),
+                Text(
+                  l10n.predictionsTitle,
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.3),
+                borderRadius: BorderRadius.circular(12),
               ),
-              Text(l10n.nextPeriodDate(formatter.format(prediction.nextPeriodStartDate))),
-              const Divider(height: 24),
-              Text(
-                l10n.fertileWindow,
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              Text(
-                "${formatter.format(prediction.fertileWindowStart)} - ${formatter.format(prediction.fertileWindowEnd)}",
-              ),
-              Text(
-                "${l10n.ovulation}: ${formatter.format(prediction.nextOvulationDate)}",
-                style: const TextStyle(fontStyle: FontStyle.italic),
-              ),
-              const Divider(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(l10n.cycleLength(prediction.avgCycleLength)),
-                  Text(l10n.periodLength(prediction.avgPeriodLength)),
+                  Text(
+                    l10n.nextPeriodPrediction(daysUntilNextPeriod > 0 ? daysUntilNextPeriod : 0),
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    l10n.nextPeriodDate(formatter.format(prediction.nextPeriodStartDate)),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+                    ),
+                  ),
                 ],
-              )
-            ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              l10n.fertileWindow,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "${formatter.format(prediction.fertileWindowStart)} - ${formatter.format(prediction.fertileWindowEnd)}",
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              "${l10n.ovulation}: ${formatter.format(prediction.nextOvulationDate)}",
+              style: TextStyle(
+                fontStyle: FontStyle.italic,
+                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildCycleInfoItem(
+                  l10n.cycleLength(prediction.avgCycleLength),
+                  Icons.repeat,
+                ),
+                _buildCycleInfoItem(
+                  l10n.periodLength(prediction.avgPeriodLength),
+                  Icons.calendar_today,
+                ),
+              ],
+            )
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCycleInfoItem(String text, IconData icon) {
+    return Row(
+      children: [
+        Icon(icon, size: 16, color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6)),
+        const SizedBox(width: 4),
+        Text(
+          text,
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+            fontSize: 12,
           ),
         ),
-      );
-    }
-    return const SizedBox.shrink();
+      ],
+    );
   }
 
   Widget _buildPillWeekTracker(AppLocalizations l10n) {
     final theme = Theme.of(context);
     final today = DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+
+    if (_packStartDate == null) {
+      return const SizedBox.shrink();
+    }
 
     final int dayInPack = today.difference(_packStartDate!).inDays;
 
@@ -962,33 +1286,53 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: List.generate(7, (index) {
-          final int currentPillIndex = startOfWeekIndex + index;
-          if (currentPillIndex >= (_pillActiveDays + _pillPlaceboDays)) {
-            return const SizedBox(width: 40);
-          }
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            l10n.pillTrackerTabTitle,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: List.generate(7, (index) {
+              final int currentPillIndex = startOfWeekIndex + index;
+              if (currentPillIndex >= (_pillActiveDays + _pillPlaceboDays)) {
+                return const SizedBox(width: 40);
+              }
 
-          final pillDate = _packStartDate!.add(Duration(days: currentPillIndex));
-          final isToday = isSameDay(pillDate, today);
-          final isTaken = _pillDays.contains(pillDate);
-          final isPlacebo = currentPillIndex >= _pillActiveDays;
+              final pillDate = _packStartDate!.add(Duration(days: currentPillIndex));
+              final isToday = isSameDay(pillDate, today);
+              final isTaken = _pillDays.contains(pillDate);
+              final isPlacebo = currentPillIndex >= _pillActiveDays;
 
-          return _PillCircle(
-            date: pillDate,
-            isToday: isToday,
-            isTaken: isTaken,
-            isPlacebo: isPlacebo,
-          );
-        }),
+              return _PillCircle(
+                date: pillDate,
+                isToday: isToday,
+                isTaken: isTaken,
+                isPlacebo: isPlacebo,
+              );
+            }),
+          ),
+        ],
       ),
     ).animate().fadeIn(duration: 400.ms, delay: 100.ms);
-  }
-
-  Widget _buildLastPeriodText(BuildContext context, AppLocalizations l10n) {
-    return const SizedBox.shrink();
   }
 }
 

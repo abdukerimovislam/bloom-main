@@ -4,64 +4,114 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 
 class FirestoreService {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _db = FirebaseFirestore.instance;
 
-  /// Получает ссылку на документ пользователя
-  /// 'users/{uid}'
+  /// Получает ID текущего пользователя
+  String? get _uid {
+    return _auth.currentUser?.uid;
+  }
+
+  /// Возвращает ссылку на документ текущего пользователя
   DocumentReference? get _userDoc {
-    final user = _auth.currentUser;
-    if (user == null) return null;
-    return _db.collection('users').doc(user.uid);
+    final uid = _uid;
+    if (uid == null) return null;
+    return _firestore.collection('users').doc(uid);
   }
 
-  /// Получает ссылку на под-коллекцию данных пользователя
-  /// 'users/{uid}/data/{docName}'
-  DocumentReference? _dataDoc(String docName) {
-    final doc = _userDoc;
-    if (doc == null) return null;
-    return doc.collection('data').doc(docName);
-  }
+  // --- Методы для SettingsService ---
 
-  // --- 1. Настройки (Settings) ---
-
-  /// Сохраняет ОДИН документ со всеми настройками
-  Future<void> saveSettings(Map<String, dynamic> data) async {
-    final doc = _dataDoc('settings');
-    if (doc == null) return;
-    // SetOptions(merge: true) не перезапишет, а ОБНОВИТ
-    // (например, если мы меняем только тему, язык не затрется)
-    await doc.set(data, SetOptions(merge: true));
-  }
-
-  /// Загружает документ со всеми настройками
+  /// Загружает все настройки из документа пользователя
   Future<Map<String, dynamic>?> loadSettings() async {
-    final doc = _dataDoc('settings');
+    final doc = _userDoc;
     if (doc == null) return null;
 
     final snapshot = await doc.get();
-    if (!snapshot.exists) return null;
-
-    return snapshot.data() as Map<String, dynamic>;
+    return snapshot.data() as Map<String, dynamic>?;
   }
 
-  // --- 2. Онбординг ---
+  /// Сохраняет (обновляет) настройки в документе пользователя
+  Future<void> saveSettings(Map<String, dynamic> data) async {
+    final doc = _userDoc;
+    if (doc == null) return;
 
-  /// Устанавливает флаг, что онбординг пройден
-  Future<void> setOnboardingCompleteInCloud() async {
-    if (_userDoc == null) return;
-    await _userDoc!.set({
-      'onboardingComplete': true
-    }, SetOptions(merge: true));
+    await doc.set(data, SetOptions(merge: true));
   }
+
+  // --- Методы для AuthGate и Onboarding ---
 
   /// Проверяет, пройден ли онбординг (в облаке)
   Future<bool> isOnboardingCompleteInCloud() async {
-    if (_userDoc == null) return false;
-    final snapshot = await _userDoc!.get();
+    final doc = _userDoc;
+    if (doc == null) return false;
+
+    final snapshot = await doc.get();
     if (!snapshot.exists) return false;
 
     final data = snapshot.data() as Map<String, dynamic>?;
     return data?['onboardingComplete'] ?? false;
+  }
+
+  // ---
+  // --- НОВЫЙ МЕТОД ДЛЯ ОНБОРДИНГА ---
+  // ---
+
+  /// Устанавливает флаг 'onboardingComplete' в true в Firestore
+  Future<void> setOnboardingCompleteInCloud() async {
+    final doc = _userDoc;
+    if (doc == null) return;
+
+    print("☁️ Firestore: Установка onboardingComplete = true");
+    await doc.set({
+      'onboardingComplete': true
+    }, SetOptions(merge: true));
+  }
+
+  // ---
+  // --- МЕТОДЫ ДЛЯ СИНХРОНИЗАЦИИ ДАННЫХ ---
+  // ---
+
+  /// (Для CycleService)
+  /// Загружает данные цикла из подколлекции 'data'
+  Future<Map<String, dynamic>?> getUserCycleData() async {
+    final doc = _userDoc;
+    if (doc == null) return null;
+
+    final snapshot = await doc.collection('data').doc('cycle').get();
+    return snapshot.data();
+  }
+
+  /// (Для PillService)
+  /// Загружает данные о таблетках из подколлекции 'data'
+  Future<Map<String, dynamic>?> getUserPillData() async {
+    final doc = _userDoc;
+    if (doc == null) return null;
+
+    final snapshot = await doc.collection('data').doc('pills').get();
+    return snapshot.data();
+  }
+
+  /// (Для SymptomService - Симптомы)
+  /// Загружает данные о симптомах из подколлекции 'data'
+  Future<Map<String, dynamic>?> getUserSymptomData() async {
+    final doc = _userDoc;
+    if (doc == null) return null;
+
+    final snapshot = await doc.collection('data').doc('symptoms').get();
+    return snapshot.data();
+  }
+
+  // ---
+  // --- НОВЫЙ МЕТОД ДЛЯ ЗАМЕТОК ---
+  // ---
+
+  /// (Для SymptomService - Заметки)
+  /// Загружает данные о заметках из подколлекции 'data'
+  Future<Map<String, dynamic>?> getUserNoteData() async {
+    final doc = _userDoc;
+    if (doc == null) return null;
+
+    final snapshot = await doc.collection('data').doc('notes').get();
+    return snapshot.data();
   }
 }
