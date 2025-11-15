@@ -25,49 +25,40 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:bloom/widgets/symptom_sheet.dart';
 import 'package:bloom/screens/pill_screen.dart';
 
-// --- ИЗМЕНЕНИЕ: Импорт Firebase ---
 import 'package:firebase_core/firebase_core.dart';
 import 'screens/splash_screen.dart';
-import 'screens/auth_gate.dart';
-import 'screens/splash_screen.dart';
+
+// --- ИЗМЕНЕНИЯ: Импортируем все сервисы и экраны, необходимые для логики ---
+import 'screens/auth_screen.dart';
+import 'screens/onboarding_screen.dart';
+import 'package:bloom/services/auth_service.dart';
+import 'package:bloom/services/sync_service.dart';
+import 'package:bloom/services/firestore_service.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 // ---
 
 void main() async {
-  // --- ИЗМЕНЕНИЕ: Инициализация Firebase ---
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(); // <-- ВАЖНО
-  // ---
+  await Firebase.initializeApp();
 
   await NotificationService.initTimezones();
   await NotificationService.init();
-  final cycleService = CycleService();
   final settingsService = SettingsService();
-
-  // --- ИЗМЕНЕНИЕ: Эту логику мы перенесли в AuthGate ---
-  // final bool showOnboarding = !(await cycleService.isOnboardingComplete());
-  // ---
 
   final String? savedLocaleCode = await settingsService.getAppLocale();
   final AppTheme savedTheme = await settingsService.getAppTheme();
 
   runApp(MyApp(
-    // --- ИЗМЕНЕНИЕ: 'showOnboarding' больше не нужен ---
-    // showOnboarding: showOnboarding,
-    // ---
     savedLocaleCode: savedLocaleCode,
     savedTheme: savedTheme,
   ));
 }
 
 class MyApp extends StatefulWidget {
-  // --- ИЗМЕНЕНИЕ: Убрали 'showOnboarding' ---
-  // final bool showOnboarding;
-  // ---
   final String? savedLocaleCode;
   final AppTheme savedTheme;
   const MyApp({
     super.key,
-    // required this.showOnboarding,
     this.savedLocaleCode,
     required this.savedTheme
   });
@@ -75,11 +66,31 @@ class MyApp extends StatefulWidget {
   State<MyApp> createState() => _MyAppState();
 }
 
+/// Простой экран загрузки, пока мы проверяем auth
+class _AppLoadingScreen extends StatelessWidget {
+  const _AppLoadingScreen();
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Lottie.asset(
+            'assets/lottie/loading_indicator.json',
+            width: 150,
+            height: 150
+        ),
+      ),
+    );
+  }
+}
+
 class _MyAppState extends State<MyApp> {
   Locale? _locale;
   late AppTheme _currentTheme;
-  // --- ДОБАВЛЕНИЕ: Состояние для сплеш-скрина ---
-  bool _showSplash = true;
+  late Widget _rootPage;
+
+  // --- ИЗМЕНЕНИЕ: Сервисы, необходимые для _signOut ---
+  final AuthService _authService = AuthService();
+  final SyncService _syncService = SyncService();
   // ---
 
   @override
@@ -89,6 +100,9 @@ class _MyAppState extends State<MyApp> {
       _locale = Locale(widget.savedLocaleCode!);
     }
     _currentTheme = widget.savedTheme;
+
+    // 1. Начинаем со сплеш-скрина
+    _rootPage = SimpleSplashScreen(onAnimationComplete: _completeSplashAndAuth);
   }
 
   void _setLocale(Locale newLocale) {
@@ -99,12 +113,92 @@ class _MyAppState extends State<MyApp> {
     setState(() { _currentTheme = newTheme; });
   }
 
-  // --- ДОБАВЛЕНИЕ: Метод для завершения сплеш-скрина ---
-  void _completeSplash() {
-    print('✅ MyApp: Splash completed, switching to AuthGate');
+  // --- ИЗМЕНЕНИЕ: Логика выхода из системы переехала сюда ---
+  Future<void> _signOut() async {
+    await _authService.signOut(); // Выходим из Firebase Auth
+    await _syncService.clearAllLocalData(); // Очищаем SharedPreferences
     if (mounted) {
       setState(() {
-        _showSplash = false;
+        _rootPage = const AuthScreen(); // Устанавливаем экран входа как корневой
+      });
+    }
+  }
+  // ---
+
+  void _completeOnboarding() {
+    if (mounted) {
+      setState(() {
+        _rootPage = HomeScreen(
+          onLocaleChanged: _setLocale,
+          onThemeChanged: _setTheme,
+          onSignOut: _signOut, // <-- Передаем коллбэк выхода
+        );
+      });
+    }
+  }
+
+  void _completeSplashAndAuth() {
+
+    // 2. Показываем экран загрузки, пока работает auth
+    if (mounted) {
+      setState(() {
+        _rootPage = const _AppLoadingScreen();
+      });
+    }
+
+    // 3. Запускаем асинхронную логику Auth
+    _runAuthLogic();
+  }
+
+  /// Эта логика (ранее в AuthGate) выполняется один раз
+  /// и решает, какой будет _rootPage.
+  Future<void> _runAuthLogic() async {
+    final AuthService authService = _authService;
+    final SyncService syncService = _syncService;
+    final FirestoreService firestoreService = FirestoreService();
+
+    Widget nextPageRoute;
+
+    try {
+      // Ждем ПЕРВОГО ответа от Firebase
+      final User? user = await authService.authStateChanges.first;
+
+      if (user == null) {
+        // --- СЛУЧАЙ 1: Пользователь НЕ вошел ---
+        await syncService.clearAllLocalData();
+        nextPageRoute = const AuthScreen(); // Показываем экран входа
+      } else {
+        // --- СЛУЧАЙ 2: Пользователь ВОШЕЛ ---
+        await syncService.syncAllFromFirestore();
+
+        if (!mounted) return;
+
+        final bool isOnboardingComplete = await firestoreService.isOnboardingCompleteInCloud();
+
+        if (isOnboardingComplete) {
+          // 2a: Вошел и все настроил -> на главный экран
+          nextPageRoute = HomeScreen(
+            onLocaleChanged: _setLocale,
+            onThemeChanged: _setTheme,
+            onSignOut: _signOut, // <-- Передаем коллбэк выхода
+          );
+        } else {
+          // 2b: Вошел, но онбординг не пройден -> на экран онбординга
+          nextPageRoute = OnboardingScreen( // <-- Убран 'const'
+            onLocaleChanged: _setLocale,
+            onOnboardingComplete: _completeOnboarding,
+          );
+        }
+      }
+    } catch (e) {
+      await syncService.clearAllLocalData();
+      nextPageRoute = const AuthScreen(); // Откат на экран входа
+    }
+
+    // 4. Устанавливаем финальный _rootPage
+    if (mounted) {
+      setState(() {
+        _rootPage = nextPageRoute;
       });
     }
   }
@@ -118,31 +212,39 @@ class _MyAppState extends State<MyApp> {
       supportedLocales: AppLocalizations.supportedLocales,
       locale: _locale,
       theme: AppThemes.getThemeData(_currentTheme),
-      // --- ИЗМЕНЕНИЕ: Показываем сплеш-скрин или AuthGate ---
-      home: _showSplash
-          ? SimpleSplashScreen(onAnimationComplete: _completeSplash)
-          : const AuthGate(),
+
+      // --- ИСПРАВЛЕНИЕ: 'home' теперь управляется состоянием _rootPage ---
+      home: _rootPage,
       // ---
+
       onGenerateRoute: (settings) => AppRouter.generateRoute(
         settings,
-        // showOnboarding: widget.showOnboarding, // <-- Больше не нужно
         onLocaleChanged: _setLocale,
         onThemeChanged: _setTheme,
+        onSignOut: _signOut, // <-- Передаем коллбэки в роутер
       ),
     );
   }
 }
 
-// --- HomeScreen ---
+// ---
+// --- ИЗМЕНЕНИЕ: HomeScreen теперь принимает onSignOut ---
+// ---
 class HomeScreen extends StatefulWidget {
   final Function(Locale) onLocaleChanged;
   final Function(AppTheme) onThemeChanged;
-  const HomeScreen({super.key, required this.onLocaleChanged, required this.onThemeChanged});
+  final VoidCallback onSignOut; // <-- Добавлено
+
+  const HomeScreen({
+    super.key,
+    required this.onLocaleChanged,
+    required this.onThemeChanged,
+    required this.onSignOut, // <-- Добавлено
+  });
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-// --- _HomeScreenState (остается БЕЗ ИЗМЕНЕНИЙ) ---
 class _HomeScreenState extends State<HomeScreen> {
 
   bool _showStartGlow = false;
@@ -327,7 +429,6 @@ class _HomeScreenState extends State<HomeScreen> {
     } else {
       _isLoading = false;
       SchedulerBinding.instance.addPostFrameCallback((_) {
-        print("Widget not mounted, skipping notification scheduling in _loadData");
       });
     }
   }
@@ -337,7 +438,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        // --- УЛУЧШЕНИЕ: Более красивый диалог ---
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: Theme.of(context).colorScheme.surface,
         title: Text(l10n.homeConfirmStartTitle, style: TextStyle(
@@ -392,7 +492,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        // --- УЛУЧШЕНИЕ: Более красивый диалог ---
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: Theme.of(context).colorScheme.surface,
         title: Text(l10n.homeConfirmEndTitle, style: TextStyle(
@@ -446,7 +545,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        // --- УЛУЧШЕНИЕ: Более красивый диалог ---
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: Theme.of(context).colorScheme.surface,
         title: Text(l10n.logBleedingButton, style: TextStyle(
@@ -488,7 +586,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final bool? confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        // --- УЛУЧШЕНИЕ: Более красивый диалог ---
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         backgroundColor: Theme.of(context).colorScheme.surface,
         title: Text(l10n.logBleedingEndButton, style: TextStyle(
@@ -550,7 +647,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onItemTapped(int index) {
-    if (_currentPageIndex == 1 || _currentPageIndex == 2 || _currentPageIndex == 3) {
+    if (index == 1) { // При переходе на Календарь
       _loadData();
     }
     setState(() {
@@ -564,7 +661,6 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      // --- УЛУЧШЕНИЕ: Более красивый bottom sheet ---
       builder: (context) {
         return Container(
           margin: const EdgeInsets.all(16),
@@ -599,6 +695,9 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  // ---
+  // --- ИЗМЕНЕНИЕ: Динамический заголовок AppBar ---
+  // ---
   String _getAppBarTitle(AppLocalizations l10n) {
     switch (_currentPageIndex) {
       case 0:
@@ -606,7 +705,7 @@ class _HomeScreenState extends State<HomeScreen> {
       case 1:
         return l10n.calendarTitle;
       case 2:
-        return "";
+        return l10n.pillTrackerTabTitle; // <-- Добавлено
       case 3:
         return l10n.settingsTitle;
       default:
@@ -614,13 +713,96 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // ---
+  // --- ИЗМЕНЕНИЕ: Динамические кнопки AppBar ---
+  // ---
+  void _openPillInfoScreen() {
+    Navigator.of(context).pushNamed(AppRouter.pillInfo);
+  }
+
+  void _showPillResetDialog() async {
+    final l10n = AppLocalizations.of(context)!;
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text(l10n.pillResetTitle, style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface,
+          fontWeight: FontWeight.w600,
+        )),
+        content: Text(l10n.pillResetDesc, style: TextStyle(
+          color: Theme.of(context).colorScheme.onSurface.withOpacity(0.8),
+        )),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(l10n.dialogCancel, style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+            )),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            child: Text(l10n.pillResetButton),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _settingsService.savePillPackSettings(null, _pillActiveDays, _pillPlaceboDays);
+      await _loadData();
+    }
+  }
+
+  List<Widget> _buildAppBarActions(AppLocalizations l10n, ThemeData theme) {
+    // Показываем кнопки только для экрана "Таблетки" (index 2)
+    if (_currentPageIndex == 2) {
+      return [
+        if (_isPillTrackerEnabled && _packStartDate != null)
+          IconButton(
+            icon: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.primary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(Icons.refresh, size: 20, color: theme.colorScheme.primary),
+            ),
+            tooltip: l10n.pillResetButton,
+            onPressed: _showPillResetDialog,
+          ),
+        IconButton(
+          icon: Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(Icons.info_outline, size: 20, color: theme.colorScheme.primary),
+          ),
+          tooltip: 'Info', // TODO: Добавить в l10n
+          onPressed: _openPillInfoScreen,
+        ),
+      ];
+    }
+    // Для других экранов кнопок нет
+    return [];
+  }
+  // ---
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
     return Scaffold(
-      // --- ДОБАВЛЕНИЕ: AppBar для главного экрана ---
+      // ---
+      // --- ИЗМЕНЕНИЕ: AppBar теперь динамический ---
+      // ---
       appBar: AppBar(
         automaticallyImplyLeading: false,
         title: Text(
@@ -632,9 +814,10 @@ class _HomeScreenState extends State<HomeScreen> {
         elevation: 0,
         backgroundColor: Colors.transparent,
         foregroundColor: theme.colorScheme.onBackground,
+        actions: _buildAppBarActions(l10n, theme), // <-- Добавлено
       ),
+      // ---
 
-      // --- УЛУЧШЕНИЕ: Градиентный фон ---
       backgroundColor: theme.colorScheme.background,
       body: Container(
         decoration: BoxDecoration(
@@ -662,16 +845,15 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             _buildMainPage(),
             const CalendarScreen(),
-            const PillScreen(),
+            const PillScreen(), // <-- PillScreen больше не имеет Scaffold
             SettingsScreen(
               onLanguageChanged: widget.onLocaleChanged,
               onThemeChanged: widget.onThemeChanged,
+              onSignOut: widget.onSignOut, // <-- Передаем коллбэк
             ),
           ],
         ),
       ),
-
-      // --- УЛУЧШЕНИЕ: Более красивый FAB ---
       floatingActionButton: _currentPageIndex == 0 ? AnimatedSlide(
         duration: const Duration(milliseconds: 300),
         offset: _isFabVisible ? Offset.zero : const Offset(0, 2),
@@ -707,8 +889,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ),
       ) : null,
-
-      // --- УЛУЧШЕНИЕ: Более красивый BottomNavigationBar ---
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           boxShadow: [
@@ -800,8 +980,6 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisAlignment: MainAxisAlignment.start,
           children: <Widget>[
             const SizedBox(height: 20),
-
-            // --- УЛУЧШЕНИЕ: Контейнер для аватара с тенью ---
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 24),
               padding: const EdgeInsets.all(20),
@@ -826,8 +1004,6 @@ class _HomeScreenState extends State<HomeScreen> {
               _buildCycleProgressBar(l10n),
 
             const SizedBox(height: 20),
-
-            // --- УЛУЧШЕНИЕ: Контейнер для InsightCard ---
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 16),
               child: InsightCard(
@@ -850,7 +1026,6 @@ class _HomeScreenState extends State<HomeScreen> {
             _buildPeriodStatusText(context, l10n),
 
             if (!_isPillTrackerEnabled)
-            // --- УЛУЧШЕНИЕ: Контейнер для PredictionCard ---
               Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
                 child: _buildPredictionCard(context, l10n),
@@ -943,7 +1118,7 @@ class _HomeScreenState extends State<HomeScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            "Today's Symptoms",
+            "Today's Symptoms", // TODO: l10n
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w600,
             ),

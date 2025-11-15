@@ -1,6 +1,5 @@
 // Файл: lib/screens/onboarding_screen.dart
 
-import 'package:bloom/main.dart';
 import 'package:bloom/services/cycle_service.dart';
 import 'package:flutter/material.dart';
 import 'package:bloom/l10n/app_localizations.dart';
@@ -8,19 +7,23 @@ import 'package:introduction_screen/introduction_screen.dart';
 import 'package:lottie/lottie.dart';
 import 'package:numberpicker/numberpicker.dart';
 
-import '../navigation/app_router.dart';
+// --- ИЗМЕНЕНИЕ: Убран AppRouter ---
+// import '../navigation/app_router.dart';
 
-// --- ИЗМЕНЕНИЕ: Импортируем новые сервисы ---
 import 'package:bloom/services/firestore_service.dart';
 import 'package:bloom/services/settings_service.dart';
-// ---
 
 class OnboardingScreen extends StatefulWidget {
   final Function(Locale) onLocaleChanged;
 
+  // --- ИЗМЕНЕНИЕ: Новый коллбэк ---
+  final VoidCallback onOnboardingComplete;
+  // ---
+
   const OnboardingScreen({
     super.key,
     required this.onLocaleChanged,
+    required this.onOnboardingComplete, // <-- Добавлено
   });
 
   @override
@@ -28,19 +31,16 @@ class OnboardingScreen extends StatefulWidget {
 }
 
 class _OnboardingScreenState extends State<OnboardingScreen> {
-  // --- ИЗМЕНЕНИЕ: Добавляем новые сервисы ---
   final CycleService _cycleService = CycleService();
   final SettingsService _settingsService = SettingsService();
   final FirestoreService _firestoreService = FirestoreService();
-  // ---
 
   int _avgCycleLength = 28;
   int _avgPeriodLength = 5;
   DateTime? _lastPeriodStart;
 
-  // --- ИЗМЕНЕНИЕ: Обновлен _onDone ---
   void _onDone() async {
-    // 1. Сохраняем настройки в SettingsService (он сам их бэкапит)
+    // 1. Сохраняем настройки в SettingsService
     await _settingsService.saveManualAvgCycleLength(_avgCycleLength);
     await _settingsService.saveManualAvgPeriodLength(_avgPeriodLength);
 
@@ -51,21 +51,21 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               (index) => _lastPeriodStart!.add(Duration(days: index))
       );
       await _cycleService.savePeriodDays(daysToSave);
-      // TODO: Мы должны забэкапить эти дни, как только
-      // cycle_service будет готов к миграции
+      // TODO: Бэкап этих дней в Firestore
     }
 
     // 3. Отмечаем онбординг пройденным (в Firestore)
     await _firestoreService.setOnboardingCompleteInCloud();
 
+    // ---
+    // --- ИСПРАВЛЕНИЕ: Вызываем коллбэк вместо навигации ---
+    // ---
     if (mounted) {
-      Navigator.of(context).pushReplacementNamed(AppRouter.home);
+      widget.onOnboardingComplete();
     }
   }
-  // ---
 
   Future<void> _pickLastPeriodDate(BuildContext context) async {
-    // ... (без изменений) ...
     final date = await showDatePicker(
       context: context,
       initialDate: DateTime.now(),
@@ -81,7 +81,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
   @override
   Widget build(BuildContext context) {
-    // ... (UI без изменений) ...
     final l10n = AppLocalizations.of(context)!;
 
     final baseTextStyle = Theme.of(context).textTheme.bodyLarge ?? const TextStyle(fontSize: 19.0, color: Colors.black54);

@@ -10,17 +10,20 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:bloom/services/notification_service.dart';
 
 import 'package:bloom/services/auth_service.dart';
-import 'package:bloom/navigation/app_router.dart';
+// --- ИЗМЕНЕНИЕ: Убран импорт AppRouter ---
+// import 'package:bloom/navigation/app_router.dart';
 
 
 class SettingsScreen extends StatefulWidget {
   final Function(Locale) onLanguageChanged;
   final Function(AppTheme) onThemeChanged;
+  final VoidCallback onSignOut; // <-- Добавлено
 
   const SettingsScreen({
     super.key,
     required this.onLanguageChanged,
     required this.onThemeChanged,
+    required this.onSignOut, // <-- Добавлено
   });
 
   @override
@@ -158,7 +161,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // --- ИЗМЕНЕНИЕ: Добавлены _signOut и _linkAccount ---
   Future<void> _signOut() async {
     final bool? confirmed = await showDialog<bool>(
       context: context,
@@ -179,14 +181,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
 
     if (confirmed == true && mounted) {
-      // TODO: Перед выходом, нужно очистить SharedPreferences,
-      // чтобы следующий пользователь не увидел кэш
-      // final prefs = await SharedPreferences.getInstance();
-      // await prefs.clear();
-
-      await _authService.signOut();
-
-      Navigator.of(context).pushNamedAndRemoveUntil(AppRouter.authGate, (route) => false);
+      // ---
+      // --- ИСПРАВЛЕНИЕ: Вызываем коллбэк вместо навигации ---
+      // ---
+      widget.onSignOut();
+      // ---
     }
   }
 
@@ -213,7 +212,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       );
     }
   }
-  // ---
 
   @override
   Widget build(BuildContext context) {
@@ -223,7 +221,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return ListView(
       children: [
-        // --- ИЗМЕНЕНИЕ: "Умная" секция "Аккаунт" ---
         ListTile(
           leading: const Icon(Icons.person_outline),
           title: Text(l10n.authAccount),
@@ -241,14 +238,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           onTap: () {
             if (_authService.isAnonymous()) {
-              _linkAccount(); // <-- Вызываем привязку
+              _linkAccount();
             } else {
               _signOut();
             }
           },
         ),
         const Divider(),
-        // ---
 
         SwitchListTile(
           title: Text(l10n.settingsNotifications),

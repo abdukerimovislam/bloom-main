@@ -52,7 +52,6 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
     // ✅ Добавляем слушатель ЗАРАНЕЕ
     _controller.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
-        print('✅ SplashScreen: Animation completed');
         _completeSplash();
       }
     });
@@ -62,20 +61,16 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
   }
 
   Future<void> _startSplashAnimation() async {
-    print('🚀 SplashScreen: Starting animation');
 
     // Лёгкая вибрация при старте
     await HapticFeedback.lightImpact();
-    print('📳 SplashScreen: Haptic feedback sent (start)');
 
     // Запуск анимации
     _controller.forward();
-    print('🎬 SplashScreen: Animation controller started');
 
     // 🛡️ Защита: если вдруг слушатель не сработает (например, ошибка Flutter)
     Future.delayed(const Duration(seconds: 3), () {
       if (mounted && _controller.status != AnimationStatus.completed) {
-        print('⚠️ SplashScreen: Timeout, forcing completion');
         _completeSplash();
       }
     });
@@ -83,24 +78,20 @@ class _SimpleSplashScreenState extends State<SimpleSplashScreen>
 
   void _completeSplash() {
     if (!mounted) {
-      print('❌ SplashScreen: Widget not mounted');
       return;
     }
 
-    print('➡️ SplashScreen: Completing splash');
 
     // Лёгкая вибрация при завершении
     HapticFeedback.lightImpact();
 
     // Вызываем переданный callback
-    print('🎯 SplashScreen: Calling onAnimationComplete');
     widget.onAnimationComplete();
   }
 
   @override
   void dispose() {
     _controller.dispose();
-    print('🗑️ SplashScreen: Disposed');
     super.dispose();
   }
 

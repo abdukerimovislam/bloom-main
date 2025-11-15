@@ -1,64 +1,56 @@
 // Файл: lib/navigation/app_router.dart
 
-import 'package:bloom/main.dart';
-import 'package:bloom/screens/onboarding_screen.dart';
 import 'package:bloom/screens/settings_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:bloom/screens/auth_gate.dart';
-import 'package:bloom/screens/auth_screen.dart';
 import 'package:bloom/themes/app_themes.dart';
 
+// --- ИЗМЕНЕНИЕ: Добавляем импорт для PillInfoScreen ---
+import 'package:bloom/screens/pill_info_screen.dart';
+// ---
+
 class AppRouter {
-  static const String home = '/';
-  static const String onboarding = '/onboarding';
+  // --- ИЗМЕНЕНИЕ: Оставляем только "внутренние" роуты ---
   static const String settings = '/settings';
-  static const String auth = '/auth';
-  static const String authGate = '/authGate';
+
+  // --- ИЗМЕНЕНИЕ: Добавляем роут pillInfo ---
+  static const String pillInfo = '/pill-info';
+  // ---
 
   static Route<dynamic> generateRoute(
       RouteSettings routeSettings, {
         required Function(Locale) onLocaleChanged,
         required Function(AppTheme) onThemeChanged,
+        required VoidCallback onSignOut,
       }) {
-    final Map<String, dynamic>? args = routeSettings.arguments as Map<String, dynamic>?;
 
     switch (routeSettings.name) {
-      case authGate:
-        return MaterialPageRoute(
-          builder: (_) => const AuthGate(),
-          settings: routeSettings,
-        );
-      case auth:
-        return MaterialPageRoute(
-          builder: (_) => const AuthScreen(),
-          settings: routeSettings,
-        );
-      case home:
-        return MaterialPageRoute(
-          builder: (_) => HomeScreen(
-            onLocaleChanged: onLocaleChanged,
-            onThemeChanged: onThemeChanged,
-          ),
-          settings: routeSettings,
-        );
-      case onboarding:
-        return MaterialPageRoute(
-          builder: (_) => OnboardingScreen(
-            onLocaleChanged: onLocaleChanged,
-          ),
-          settings: routeSettings,
-        );
+
       case settings:
         return MaterialPageRoute(
           builder: (_) => SettingsScreen(
-            onLanguageChanged: args?['onLanguageChanged'] ?? onLocaleChanged,
-            onThemeChanged: args?['onThemeChanged'] ?? onThemeChanged,
+            onLanguageChanged: onLocaleChanged,
+            onThemeChanged: onThemeChanged,
+            onSignOut: onSignOut,
           ),
           settings: routeSettings,
         );
-      default:
+
+    // --- ИЗМЕНЕНИЕ: Добавляем case для pillInfo ---
+      case pillInfo:
         return MaterialPageRoute(
-          builder: (_) => const AuthGate(),
+          builder: (_) => const PillInfoScreen(),
+        );
+    // ---
+
+      default:
+      // Возвращаем ошибку, если роут не найден
+        return MaterialPageRoute(
+          builder: (_) => Scaffold(
+            appBar: AppBar(title: const Text("Ошибка")),
+            body: const Center(
+              child: Text('Роут не найден'),
+            ),
+          ),
           settings: routeSettings,
         );
     }

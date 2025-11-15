@@ -12,6 +12,9 @@ import 'package:bloom/services/cycle_service.dart';
 import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
+// --- ИЗМЕНЕНИЕ: Добавляем AppRouter для навигации ---
+import 'package:bloom/navigation/app_router.dart';
+
 class PillScreen extends StatefulWidget {
   const PillScreen({super.key});
 
@@ -85,9 +88,8 @@ class _PillScreenState extends State<PillScreen> {
   }
 
   void _openInfoScreen() {
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (context) => const PillInfoScreen()),
-    );
+    // --- ИСПРАВЛЕНИЕ: Используем AppRouter для навигации ---
+    Navigator.of(context).pushNamed(AppRouter.pillInfo);
   }
 
   void _onPillTrackerEnabledChanged(bool value) async {
@@ -233,68 +235,71 @@ class _PillScreenState extends State<PillScreen> {
     final l10n = AppLocalizations.of(context)!;
     final theme = Theme.of(context);
 
-    return Scaffold(
-      // --- ДОБАВЛЕНИЕ: AppBar для экрана таблеток ---
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Text(
-          l10n.pillTrackerTabTitle,
-          style: theme.textTheme.titleLarge?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        elevation: 0,
-        backgroundColor: Colors.transparent,
-        foregroundColor: theme.colorScheme.onBackground,
-        actions: [
-          if (_isPillTrackerEnabled && _packStartDate != null)
-            IconButton(
-              icon: Container(
-                padding: const EdgeInsets.all(6),
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primary.withOpacity(0.1),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(Icons.refresh, size: 20, color: theme.colorScheme.primary),
-              ),
-              tooltip: l10n.pillResetButton,
-              onPressed: _showResetPackDialog,
-            ),
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.all(6),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primary.withOpacity(0.1),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(Icons.info_outline, size: 20, color: theme.colorScheme.primary),
-            ),
-            onPressed: _openInfoScreen,
-          ),
-        ],
-      ),
-
+    // --- ИСПРАВЛЕНИЕ: Убран Scaffold и AppBar ---
+    return Container(
       // --- УЛУЧШЕНИЕ: Градиентный фон ---
-      backgroundColor: theme.colorScheme.background,
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              theme.colorScheme.background,
-              theme.colorScheme.background,
-              theme.colorScheme.surface.withOpacity(0.3),
-            ],
-            stops: const [0.0, 0.6, 1.0],
-          ),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            theme.colorScheme.background,
+            theme.colorScheme.background,
+            theme.colorScheme.surface.withOpacity(0.3),
+          ],
+          stops: const [0.0, 0.6, 1.0],
         ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            children: [
-              // --- УЛУЧШЕНИЕ: Карточка для переключателя ---
+      ),
+      child: SingleChildScrollView(
+        // --- ИСПРАВЛЕНИЕ: Добавлен padding, который был у Scaffold ---
+        padding: const EdgeInsets.fromLTRB(24.0, 0, 24.0, 24.0),
+        child: Column(
+          children: [
+            // --- УЛУЧШЕНИЕ: Карточка для переключателя ---
+            Container(
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: SwitchListTile(
+                title: Text(
+                  l10n.settingsPillTrackerEnable,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  l10n.settingsPillTrackerDesc,
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: theme.colorScheme.onSurface.withOpacity(0.7),
+                  ),
+                ),
+                value: _isPillTrackerEnabled,
+                onChanged: _onPillTrackerEnabledChanged,
+                secondary: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primary.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.medication_outlined, color: theme.colorScheme.primary),
+                ),
+                controlAffinity: ListTileControlAffinity.trailing,
+              ),
+            ),
+
+            const SizedBox(height: 24),
+
+            if (_isLoading)
               Container(
+                padding: const EdgeInsets.all(40),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.surface,
                   borderRadius: BorderRadius.circular(16),
@@ -306,63 +311,21 @@ class _PillScreenState extends State<PillScreen> {
                     ),
                   ],
                 ),
-                child: SwitchListTile(
-                  title: Text(
-                    l10n.settingsPillTrackerEnable,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  subtitle: Text(
-                    l10n.settingsPillTrackerDesc,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurface.withOpacity(0.7),
-                    ),
-                  ),
-                  value: _isPillTrackerEnabled,
-                  onChanged: _onPillTrackerEnabledChanged,
-                  secondary: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: theme.colorScheme.primary.withOpacity(0.1),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(Icons.medication_outlined, color: theme.colorScheme.primary),
-                  ),
-                  controlAffinity: ListTileControlAffinity.trailing,
-                ),
-              ),
-
-              const SizedBox(height: 24),
-
-              if (_isLoading)
-                Container(
-                  padding: const EdgeInsets.all(40),
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Center(child: CircularProgressIndicator()),
-                )
-              else if (_isPillTrackerEnabled)
-                _packStartDate == null
-                    ? _buildSetupForm(l10n, theme)
-                    : _buildBlisterView(l10n, theme)
-              else
-                _buildDisabledState(l10n, theme),
-            ],
-          ),
+                child: const Center(child: CircularProgressIndicator()),
+              )
+            else if (_isPillTrackerEnabled)
+              _packStartDate == null
+                  ? _buildSetupForm(l10n, theme)
+                  : _buildBlisterView(l10n, theme)
+            else
+              _buildDisabledState(l10n, theme),
+          ],
         ),
       ),
     );
   }
+
+  // ... (Все методы _build... остаются без изменений) ...
 
   Widget _buildDisabledState(AppLocalizations l10n, ThemeData theme) {
     return Container(

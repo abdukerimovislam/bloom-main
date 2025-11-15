@@ -33,6 +33,7 @@ dependencies:
   cloud_firestore: ^5.0.2
   google_sign_in: ^6.2.1
   font_awesome_flutter: ^10.12.0
+  flutter_launcher_icons: "^0.13.1" # <-- Добавьте эту строку
 
 
 dev_dependencies:
@@ -47,8 +48,23 @@ flutter:
   uses-material-design: true
 
 
+
   assets:
     - assets/lottie/
+    - assets/icon/
+
+
+flutter_launcher_icons:
+  android: "launcher_icon" # Или true, чтобы сгенерировать адаптивную иконку
+  ios: true
+  image_path: "assets/icon/app_icon.png" # Путь к вашему изображению иконки
+
+
+  adaptive_icon_background: "#FFFFFF" # Цвет фона (может быть в формате #RRGGBB)
+  adaptive_icon_foreground: "assets/icon/app_icon.png" # Отдельный файл для переднего плана
+
+
+
 
   fonts:
     - family: Nunito

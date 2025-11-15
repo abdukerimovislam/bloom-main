@@ -1,13 +1,14 @@
 // Файл: lib/screens/auth_gate.dart
 
 import 'dart:async';
-import 'package:bloom/navigation/app_router.dart';
 import 'package:bloom/services/auth_service.dart';
 import 'package:bloom/services/firestore_service.dart';
 import 'package:bloom/services/sync_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
+
+import 'package:bloom/navigation/app_router.dart';
 
 class AuthGate extends StatefulWidget {
   const AuthGate({super.key});
@@ -51,7 +52,6 @@ class _AuthGateState extends State<AuthGate> {
         }
       } else {
         // --- СЛУЧАЙ 2: Пользователь ВОШЕЛ ---
-        print('✅ AuthGate: Пользователь вошел (${user.uid}). Синхронизация данных...');
         await _syncService.syncAllFromFirestore();
 
         if (!mounted) return;
@@ -62,16 +62,13 @@ class _AuthGateState extends State<AuthGate> {
 
         if (isOnboardingComplete) {
           // 2a: Вошел и все настроил -> на главный экран
-          print('🏠 AuthGate: Онбординг пройден. Переход на Home.');
           Navigator.of(context).pushReplacementNamed(AppRouter.home);
         } else {
           // 2b: Вошел, но онбординг не пройден -> на экран онбординга
-          print('👋 AuthGate: Онбординг не пройден. Переход на Onboarding.');
           Navigator.of(context).pushReplacementNamed(AppRouter.onboarding);
         }
       }
     } catch (e) {
-      print("❌ AuthGate: КРИТИЧЕСКАЯ ОШИБКА во время входа/синхронизации: $e");
       if (mounted) {
         await _syncService.clearAllLocalData();
         Navigator.of(context).pushReplacementNamed(AppRouter.auth);
