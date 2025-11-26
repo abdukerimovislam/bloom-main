@@ -24,32 +24,68 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _isLoading = false;
   String? _errorMessage;
 
+  // ------------------------------
+  // GOOGLE SIGN IN
+  // ------------------------------
   Future<void> _googleSignIn() async {
-    setState(() { _isLoading = true; _errorMessage = null; });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
     final error = await _auth.signInWithGoogle();
-    if (error != null && mounted) {
+
+    if (!mounted) return;
+
+    if (error != null) {
+      // ❗ Google login ERROR
       setState(() {
-        _errorMessage = error;
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    } else {
+      // ❗ Google login SUCCESS → stop loader
+      setState(() {
         _isLoading = false;
       });
     }
   }
 
+  // ------------------------------
+  // GUEST SIGN IN
+  // ------------------------------
   Future<void> _guestSignIn() async {
-    setState(() { _isLoading = true; _errorMessage = null; });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
     final error = await _auth.signInAnonymously();
-    if (error != null && mounted) {
+
+    if (!mounted) return;
+
+    if (error != null) {
       setState(() {
-        _errorMessage = error;
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
         _isLoading = false;
       });
     }
   }
 
+  // ------------------------------
+  // EMAIL / PASSWORD SIGN IN
+  // ------------------------------
   Future<void> _submitForm() async {
     if (!_formKey.currentState!.validate()) return;
 
-    setState(() { _isLoading = true; _errorMessage = null; });
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
 
     String? error;
     if (_isLogin) {
@@ -64,13 +100,17 @@ class _AuthScreenState extends State<AuthScreen> {
       );
     }
 
-    if (mounted) {
-      if (error != null) {
-        setState(() {
-          _errorMessage = error;
-          _isLoading = false;
-        });
-      }
+    if (!mounted) return;
+
+    if (error != null) {
+      setState(() {
+        _errorMessage = error.toString();
+        _isLoading = false;
+      });
+    } else {
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -101,15 +141,15 @@ class _AuthScreenState extends State<AuthScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Lottie.asset(
-                  'assets/lottie/avatar_welcome.json',
-                  width: 150,
-                  height: 150
+                'assets/lottie/avatar_welcome.json',
+                width: 150,
+                height: 150,
               ),
               const SizedBox(height: 20),
               Text(
                 _isLogin ? l10n.authLogin : l10n.authRegister,
                 style: theme.textTheme.headlineLarge?.copyWith(
-                    fontFamily: 'Nunito'
+                  fontFamily: 'Nunito',
                 ),
               ),
               const SizedBox(height: 24),
@@ -120,9 +160,7 @@ class _AuthScreenState extends State<AuthScreen> {
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    // --- ИСПРАВЛЕНИЕ: 'const' удален ---
                     icon: FaIcon(FontAwesomeIcons.google, size: 20),
-                    // ---
                     label: Text(l10n.authWithGoogle),
                     style: ElevatedButton.styleFrom(
                       padding: const EdgeInsets.symmetric(vertical: 12),
@@ -145,13 +183,18 @@ class _AuthScreenState extends State<AuthScreen> {
                     child: Text(l10n.authAsGuest),
                   ),
                 ),
-
                 Padding(
                   padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  child: Text(l10n.authOr.toUpperCase(), style: theme.textTheme.labelSmall),
+                  child: Text(
+                    l10n.authOr.toUpperCase(),
+                    style: theme.textTheme.labelSmall,
+                  ),
                 ),
               ],
 
+              // ------------------------------
+              // EMAIL / PASSWORD FORM
+              // ------------------------------
               Form(
                 key: _formKey,
                 child: Column(
@@ -163,8 +206,10 @@ class _AuthScreenState extends State<AuthScreen> {
                         labelText: l10n.authEmail,
                         border: const OutlineInputBorder(),
                       ),
-                      validator: (value) => (value == null || !value.contains('@'))
-                          ? 'Please enter a valid email' : null,
+                      validator: (value) =>
+                      (value == null || !value.contains('@'))
+                          ? 'Please enter a valid email'
+                          : null,
                     ),
                     const SizedBox(height: 16),
                     TextFormField(
@@ -174,13 +219,16 @@ class _AuthScreenState extends State<AuthScreen> {
                         labelText: l10n.authPassword,
                         border: const OutlineInputBorder(),
                       ),
-                      validator: (value) => (value == null || value.length < 6)
-                          ? 'Password must be at least 6 characters' : null,
+                      validator: (value) =>
+                      (value == null || value.length < 6)
+                          ? 'Password must be at least 6 characters'
+                          : null,
                     ),
                   ],
                 ),
               ),
-              if (_errorMessage != null && _errorMessage!.isNotEmpty)
+
+              if (_errorMessage != null)
                 Padding(
                   padding: const EdgeInsets.only(top: 16.0),
                   child: Text(
@@ -189,7 +237,9 @@ class _AuthScreenState extends State<AuthScreen> {
                     textAlign: TextAlign.center,
                   ),
                 ),
+
               const SizedBox(height: 24),
+
               if (!_isLoading)
                 SizedBox(
                   width: double.infinity,
@@ -198,12 +248,19 @@ class _AuthScreenState extends State<AuthScreen> {
                       padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                     onPressed: _submitForm,
-                    child: Text(_isLogin ? l10n.authLogin : l10n.authRegister),
+                    child: Text(
+                      _isLogin ? l10n.authLogin : l10n.authRegister,
+                    ),
                   ),
                 ),
+
               TextButton(
                 onPressed: _isLoading ? null : _toggleForm,
-                child: Text(_isLogin ? l10n.authSwitchToRegister : l10n.authSwitchToLogin),
+                child: Text(
+                  _isLogin
+                      ? l10n.authSwitchToRegister
+                      : l10n.authSwitchToLogin,
+                ),
               ),
             ],
           ),

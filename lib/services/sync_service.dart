@@ -1,60 +1,67 @@
 // Файл: lib/services/sync_service.dart
 
+import 'dart:async';
 import 'package:bloom/services/settings_service.dart';
 import 'package:bloom/services/cycle_service.dart';
 import 'package:bloom/services/symptom_service.dart';
 import 'package:bloom/services/pill_service.dart';
 
 /// Сервис-координатор для управления синхронизацией данных.
-/// Абстрагирует логику "скачать все" и "очистить все"
-/// от AuthGate.
 class SyncService {
-  // Получаем экземпляры всех сервисов, управляющих данными
   final SettingsService _settingsService = SettingsService();
   final CycleService _cycleService = CycleService();
   final SymptomService _symptomService = SymptomService();
   final PillService _pillService = PillService();
 
-  /// Вызывает [syncFromFirestore] у всех сервисов.
-  /// Скачивает данные из Firestore и сохраняет их локально
-  /// (в SharedPreferences).
+  bool _isSyncing = false;
+
+  /// Скачивает данные из Firestore и сохраняет локально.
   Future<void> syncAllFromFirestore() async {
+    if (_isSyncing) {
+      print("⚠️ SyncService: Синхронизация уже выполняется — пропуск вызова");
+      return;
+    }
+
+    _isSyncing = true;
     print("🔄 SyncService: Начинается полная синхронизация из Firestore...");
+
     try {
-      // Запускаем все синхронизации параллельно для максимальной скорости
       await Future.wait([
         _settingsService.syncFromFirestore(),
         _cycleService.syncFromFirestore(),
         _symptomService.syncFromFirestore(),
         _pillService.syncFromFirestore(),
-      ]);
-      print("✅ SyncService: Полная синхронизация завершена.");
-    } catch (e) {
+      ]).timeout(
+        const Duration(seconds: 20),
+        onTimeout: () => throw Exception("⏳ SyncService: Таймаут синхронизации"),
+      );
+
+      print("✅ SyncService: Полная синхронизация завершена");
+    } catch (e, stack) {
       print("❌ SyncService: Ошибка во время синхронизации: $e");
-      // Пробрасываем ошибку выше (в AuthGate), чтобы он мог
-      // обработать ее (например, разлогинить пользователя)
-      rethrow;
+      print(stack);
+      rethrow; // пробрасываем дальше в AuthGate
+    } finally {
+      _isSyncing = false;
     }
   }
 
-  /// Вызывает [clearLocalData] у всех сервисов.
-  /// Используется при выходе пользователя, чтобы очистить все
-  /// локальные данные (SharedPreferences).
+  /// Полная очистка локальных данных SharedPreferences.
   Future<void> clearAllLocalData() async {
-    print("🧹 SyncService: Очистка всех локальных данных пользователя...");
+    print("🧹 SyncService: Очистка всех локальных данных...");
+
     try {
-      // Также запускаем параллельно
       await Future.wait([
         _settingsService.clearLocalData(),
         _cycleService.clearLocalData(),
         _symptomService.clearLocalData(),
         _pillService.clearLocalData(),
       ]);
-      print("✅ SyncService: Локальные данные очищены.");
-    } catch (e) {
-      print("❌ SyncService: Ошибка при очистке локальных данных: $e");
-      // Здесь мы НЕ пробрасываем ошибку.
-      // Пользователь должен быть разлогинен, даже если очистка не удалась.
+
+      print("✅ SyncService: Локальные данные очищены");
+    } catch (e, stack) {
+      print("❌ SyncService: Ошибка очистки: $e");
+      print(stack);
     }
   }
 }

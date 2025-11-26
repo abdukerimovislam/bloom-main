@@ -1,5 +1,3 @@
-// Файл: lib/screens/auth_gate.dart
-
 import 'dart:async';
 import 'package:bloom/services/auth_service.dart';
 import 'package:bloom/services/firestore_service.dart';
@@ -7,7 +5,6 @@ import 'package:bloom/services/sync_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
-
 import 'package:bloom/navigation/app_router.dart';
 
 class AuthGate extends StatefulWidget {
@@ -25,84 +22,101 @@ class _AuthGateState extends State<AuthGate> {
   @override
   void initState() {
     super.initState();
-    // Вызываем нашу одноразовую функцию проверки
-    _handleAuthCheck();
+    Future.microtask(_handleAuthFlow);
   }
 
-  /// Эта функция запускается ОДИН РАЗ и решает, куда
-  /// перенаправить пользователя.
-  Future<void> _handleAuthCheck() async {
+  Future<void> _handleAuthFlow() async {
     try {
-      // --- КЛЮЧЕВОЕ ИЗМЕНЕНИЕ ---
-      // Мы ждем ТОЛЬКО ПЕРВОГО ответа от Firebase.
-      // Это Future, а не Stream, поэтому он выполнится 1 раз.
-      final User? user = await _authService.authStateChanges.first;
-      // ---
+      /// 1) Сначала пробуем быстрый вариант
+      User? user = FirebaseAuth.instance.currentUser;
 
-      // Убедимся, что виджет не был удален, пока мы ждали
+      /// 2) Если null — ждём стрим, но ограничиваемся 3 секундами
+      user ??= await _authService.authStateChanges
+          .first
+          .timeout(const Duration(seconds: 3), onTimeout: () => null);
+
       if (!mounted) return;
 
+      /// --- Если пользователь НЕ авторизован ---
       if (user == null) {
-        // --- СЛУЧАЙ 1: Пользователь НЕ вошел ---
-        print('🔒 AuthGate: Пользователь не вошел. Очистка локальных данных...');
-        await _syncService.clearAllLocalData();
+        await _safeClearLocalData();
+        _go(AppRouter.auth);
+        return;
+      }
 
-        if (mounted) {
-          Navigator.of(context).pushReplacementNamed(AppRouter.auth);
-        }
+      /// --- Пользователь авторизован ---
+      /// Синхронизация с тайм-аутом (чтобы не зависнуть)
+      await _runWithTimeout(
+        _syncService.syncAllFromFirestore(),
+        fallback: () => null,
+      );
+
+      if (!mounted) return;
+
+      /// Проверка онбординга (тоже с тайм-аутом)
+      final bool isOnboardingComplete = await _runWithTimeout(
+        _firestoreService.isOnboardingCompleteInCloud(),
+        fallback: () => false,
+      );
+
+      if (!mounted) return;
+
+      /// --- Навигация ---
+      if (isOnboardingComplete) {
+        _go(AppRouter.home);
       } else {
-        // --- СЛУЧАЙ 2: Пользователь ВОШЕЛ ---
-        await _syncService.syncAllFromFirestore();
-
-        if (!mounted) return;
-
-        final bool isOnboardingComplete = await _firestoreService.isOnboardingCompleteInCloud();
-
-        if (!mounted) return;
-
-        if (isOnboardingComplete) {
-          // 2a: Вошел и все настроил -> на главный экран
-          Navigator.of(context).pushReplacementNamed(AppRouter.home);
-        } else {
-          // 2b: Вошел, но онбординг не пройден -> на экран онбординга
-          Navigator.of(context).pushReplacementNamed(AppRouter.onboarding);
-        }
+        _go(AppRouter.onboarding);
       }
     } catch (e) {
-      if (mounted) {
-        await _syncService.clearAllLocalData();
-        Navigator.of(context).pushReplacementNamed(AppRouter.auth);
-      }
+      await _safeClearLocalData();
+      if (mounted) _go(AppRouter.auth);
     }
   }
 
-  @override
-  void dispose() {
-    // Нам больше не нужно отменять подписку,
-    // так как мы ее не создавали.
-    super.dispose();
+  /// Безопасный вызов очистки, чтобы не упасть
+  Future<void> _safeClearLocalData() async {
+    try {
+      await _runWithTimeout(
+        _syncService.clearAllLocalData(),
+        fallback: () => null,
+      );
+    } catch (_) {}
+  }
+
+  /// Функция тайм-аута
+  Future<T> _runWithTimeout<T>(Future<T> future, {required T Function() fallback}) async {
+    try {
+      return await future.timeout(const Duration(seconds: 5));
+    } on TimeoutException {
+      return fallback();
+    } catch (_) {
+      return fallback();
+    }
+  }
+
+  /// Унифицированная навигация
+  void _go(String route) {
+    if (!mounted) return;
+    Navigator.pushReplacementNamed(context, route);
   }
 
   @override
   Widget build(BuildContext context) {
-    // Этот экран будет отображаться, пока _handleAuthCheck
-    // выполняет свою асинхронную работу.
     return const _LoadingScreen();
   }
 }
 
-
-/// Простой экран загрузки
 class _LoadingScreen extends StatelessWidget {
   const _LoadingScreen();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
         child: Lottie.asset(
-            'assets/lottie/loading_indicator.json',
-            width: 150,
-            height: 150
+          'assets/lottie/loading_indicator.json',
+          width: 150,
+          height: 150,
         ),
       ),
     );

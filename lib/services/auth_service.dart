@@ -1,125 +1,199 @@
-// Файл: lib/services/auth_service.dart
-
 import 'package:firebase_auth/firebase_auth.dart';
-// --- ИЗМЕНЕНИЕ: Импорт Google Sign In ---
 import 'package:google_sign_in/google_sign_in.dart';
-// ---
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  // --- ИЗМЕНЕНИЕ: Добавляем GoogleSignIn ---
-  final GoogleSignIn _googleSignIn = GoogleSignIn();
-  // ---
 
-  /// Поток, который слушает состояние (вход/выход)
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email'],
+  );
 
-  /// Получить текущего пользователя
+  /// Самый стабильный поток
+  Stream<User?> get authStateChanges => _auth.userChanges();
+
   User? get currentUser => _auth.currentUser;
 
-  // --- ИЗМЕНЕНИЕ: Проверка на "Инкогнито" ---
-  /// Проверяет, является ли текущий пользователь анонимным
-  bool isAnonymous() {
-    return _auth.currentUser?.isAnonymous ?? false;
-  }
-  // ---
+  bool isAnonymous() => _auth.currentUser?.isAnonymous ?? false;
 
-  /// Вход по Email
-  Future<String?> signIn({required String email, required String password}) async {
+  // -------------------------------------------------
+  // EMAIL LOGIN / SIGNUP
+  // -------------------------------------------------
+
+  Future<String?> signIn({
+    required String email,
+    required String password,
+  }) async {
     try {
-      await _auth.signInWithEmailAndPassword(email: email, password: password);
-      return null; // Успех
+      await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      return null;
     } on FirebaseAuthException catch (e) {
-      return e.message;
+      return _mapError(e);
     }
   }
 
-  /// Регистрация по Email
-  Future<String?> signUp({required String email, required String password}) async {
+  Future<String?> signUp({
+    required String email,
+    required String password,
+  }) async {
     try {
-      await _auth.createUserWithEmailAndPassword(email: email, password: password);
-      return null; // Успех
+      await _auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+
+      // Если захочешь — можно включить подтверждение email
+      // await _auth.currentUser?.sendEmailVerification();
+
+      return null;
     } on FirebaseAuthException catch (e) {
-      return e.message;
+      return _mapError(e);
     }
   }
 
-  // --- ИЗМЕНЕНИЕ: Новый метод (Google) ---
-  /// Вход через Google
+  // -------------------------------------------------
+  // GOOGLE SIGN IN
+  // -------------------------------------------------
+
   Future<String?> signInWithGoogle() async {
     try {
-      // 1. Запрос Google
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-      if (googleUser == null) return "Google sign in aborted"; // Пользователь отменил
+      // Чистим прошлую сессию Google (фикс ошибки "ongoing sign in")
+      try {
+        await _googleSignIn.disconnect();
+      } catch (_) {}
 
-      // 2. Получение auth деталей
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      // Запускаем Google Sign In
+      final GoogleSignInAccount? googleUser =
+      await _googleSignIn.signIn();
+      if (googleUser == null) return "Sign in cancelled";
 
-      // 3. Создание учетных данных Firebase
-      final AuthCredential credential = GoogleAuthProvider.credential(
+      final GoogleSignInAuthentication googleAuth =
+      await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // 4. Вход в Firebase
       await _auth.signInWithCredential(credential);
-      return null; // Успех
+
+      return null;
     } on FirebaseAuthException catch (e) {
-      return e.message;
+      return _mapError(e);
     } catch (e) {
       return e.toString();
     }
   }
-  // ---
 
-  // --- ИЗМЕНЕНИЕ: Новый метод (Инкогнито) ---
-  /// Вход "Инкогнито" (Анонимно)
+  // -------------------------------------------------
+  // ANONYMOUS LOGIN
+  // -------------------------------------------------
+
   Future<String?> signInAnonymously() async {
     try {
+      if (_auth.currentUser != null) return null;
+
       await _auth.signInAnonymously();
-      return null; // Успех
+      return null;
     } on FirebaseAuthException catch (e) {
-      return e.message;
+      return _mapError(e);
     }
   }
-  // ---
 
-  // --- ИЗМЕНЕНИЕ: Новый метод (Привязка) ---
-  /// Привязывает Google аккаунт к текущему Анонимному
+  // -------------------------------------------------
+  // LINK GOOGLE TO ANONYMOUS ACCOUNT
+  // -------------------------------------------------
+
   Future<String?> linkGoogleAccount() async {
     try {
-      if (_auth.currentUser == null || !_auth.currentUser!.isAnonymous) {
+      final user = _auth.currentUser;
+
+      if (user == null || !user.isAnonymous) {
         return "Only anonymous users can link accounts.";
       }
 
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      // Начинаем Google вход
+      final googleUser = await _googleSignIn.signIn();
       if (googleUser == null) return "Google sign in aborted";
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-      final AuthCredential credential = GoogleAuthProvider.credential(
+      final googleAuth = await googleUser.authentication;
+
+      final credential = GoogleAuthProvider.credential(
         accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
-      // 3. Привязка (link) вместо входа (signIn)
-      await _auth.currentUser!.linkWithCredential(credential);
-      return null; // Успех
+      // 🔗 Пытаемся привязать Google к гостю
+      await user.linkWithCredential(credential);
+      return null;
     } on FirebaseAuthException catch (e) {
+
+      // ---------------------------------------------
+      // 🎯 Уникальная обработка конфликта:
+      // Google already linked to ANOTHER account
+      // ---------------------------------------------
       if (e.code == 'credential-already-in-use') {
-        return 'This Google account is already linked to another user.';
+        try {
+          // 1. Входим в существующий Google аккаунт
+          final googleUserCredential =
+          await _auth.signInWithCredential(GoogleAuthProvider.credential(
+            accessToken: (await _googleSignIn.currentUser?.authentication)?.accessToken,
+            idToken: (await _googleSignIn.currentUser?.authentication)?.idToken,
+          ));
+
+          // 2. Успешно вошли → значит нужно удалить старого гостя
+          await _auth.currentUser?.delete();
+
+          return null;
+        } catch (e2) {
+          return "Failed to sign in to existing Google account: $e2";
+        }
       }
+
       return e.message;
     } catch (e) {
       return e.toString();
     }
   }
-  // ---
 
-  /// Выход
+
+  // -------------------------------------------------
+  // SIGN OUT
+  // -------------------------------------------------
+
   Future<void> signOut() async {
-    // --- ИЗМЕНЕНИЕ: Нужно также выйти из Google ---
+    try {
+      await _googleSignIn.disconnect();
+    } catch (_) {}
+
     await _googleSignIn.signOut();
     await _auth.signOut();
-    // ---
+  }
+
+  // -------------------------------------------------
+  // ERROR MAPPER
+  // -------------------------------------------------
+
+  String _mapError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'user-not-found':
+        return "User not found.";
+      case 'wrong-password':
+        return "Incorrect password.";
+      case 'email-already-in-use':
+        return "Email already exists.";
+      case 'weak-password':
+        return "Password is too weak.";
+      case 'invalid-email':
+        return "Invalid email address.";
+      case 'credential-already-in-use':
+        return "This Google account is already linked.";
+      case 'requires-recent-login':
+        return "Please login again and retry.";
+      default:
+        return e.message ?? e.code;
+    }
   }
 }
